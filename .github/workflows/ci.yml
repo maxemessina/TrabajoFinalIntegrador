@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  repository:
+    name: Comprobar base del repositorio
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Comprobar estructura y variables de entorno
+        shell: bash
+        run: |
+          set -euo pipefail
+          for directory in backend frontend docs postman; do
+            test -d "$directory"
+          done
+          test -f README.md
+          test -f sample.env
+          for file in .env .env.local backend/.env frontend/.env; do
+            git check-ignore --no-index -q "$file"
+          done
+          if git check-ignore --no-index -q sample.env; then
+            echo "sample.env no debe estar ignorado" >&2
+            exit 1
+          fi
+          if git ls-files | grep -E '(^|/)\.env(\..*)?$'; then
+            echo "Los archivos .env no deben estar versionados" >&2
+            exit 1
+          fi
+      - name: Comprobar espacios del último commit
+        run: git show --format= --check HEAD
