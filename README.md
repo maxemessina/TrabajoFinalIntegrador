@@ -8,7 +8,7 @@ Portal para buscar profesionales por zona y especialidad, gestionar turnos y aco
 
 - `backend/`: base de la API con Node.js, TypeScript y Express; ver [instrucciones de instalación y ejecución](backend/README.md).
 - `frontend/`: futura aplicación con React y TypeScript.
-- `docs/`: documentación compartida y futuro contrato de la API.
+- `docs/`: documentación compartida y [contrato API v1 propuesto](docs/contrato-api.md).
 - `postman/`: futura colección de pruebas de la API.
 - [DER.md](DER.md): propuesta de modelo de datos para PostgreSQL.
 

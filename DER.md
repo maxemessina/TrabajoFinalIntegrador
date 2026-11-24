@@ -4,6 +4,8 @@
 
 Este documento es la propuesta de modelo de datos compartida por Máximo, Priscila y Valentina para el portal. Sirve como referencia para los mocks, contratos de la API, migraciones de PostgreSQL y modelos de Sequelize. **Es un diseño propuesto, no una base ya implementada**: si el equipo cambia una decisión, debe actualizar el diagrama, el diccionario y los contratos afectados.
 
+El [contrato API v1](docs/contrato-api.md) documenta las representaciones, permisos, operaciones y ejemplos propuestos para revisión del equipo.
+
 La fuente funcional es la [propuesta técnica](../Proyecto/Propuesta-Tecnica-Portal-Independientes.docx.pdf); los requisitos de evaluación están en [Prototipo_V1.1.pdf](../2-prototipo/Prototipo_V1.1.pdf) y la [plantilla de entrega](../2-prototipo/Plantilla_entrega_prototipo_v3.docx). Estos enlaces apuntan a archivos fuera del repositorio local: al publicar el documento, compartir esas fuentes por separado o actualizar los enlaces.
 
 La consigna del **prototipo** pide un sistema navegable con respuestas mock y sin generar movimientos en la base de datos. El modelo siguiente contempla la **aplicación final** con persistencia real. Para evaluar el prototipo, usar datos ficticios y un modo mock sin escrituras persistentes; altas, bajas y modificaciones pueden simularse en memoria o responder 2xx, aclarando el comportamiento. Mantener la misma forma de respuesta acordada para no obligar al frontend a cambiar al conectar PostgreSQL.

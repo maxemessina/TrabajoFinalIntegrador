@@ -65,7 +65,7 @@ La CI ejecuta estas comprobaciones con Node.js 22.18 y 24. `typecheck` también 
 
 ## Respuestas iniciales
 
-Estas formas son provisionales hasta acordar el contrato general en PGSI-2:
+Estas formas coinciden con la propuesta del [contrato API v1](../docs/contrato-api.md).
 
 - `GET /api/v1/health`: `200` y `{"data":{"status":"ok"}}`. Verifica que el proceso responde, no la conexión a una base de datos.
 - Rutas inexistentes y errores: `{"error":{"code":"NOT_FOUND","message":"Recurso no encontrado"}}`, con el estado HTTP correspondiente. Los errores internos no exponen detalles al cliente y se registran en el servidor.
