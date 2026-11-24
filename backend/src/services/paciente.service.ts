@@ -1,5 +1,5 @@
-import { literal, Op } from 'sequelize';
-import type { Order, WhereOptions } from 'sequelize';
+import { fn, literal, Op } from 'sequelize';
+import type { FindAttributeOptions, Order, WhereOptions } from 'sequelize';
 import { HttpError } from '../http-error.ts';
 import type { AuthIdentity } from '../middleware/auth.ts';
 import type { PacienteListQuery } from '../schemas/paciente.schema.ts';
@@ -19,9 +19,13 @@ export type PacienteResource = {
 function toResource(
   patient: InstanceType<ApplicationModels['Paciente']>,
   user = patient.usuario,
+  roleActive: unknown = patient.get('rol_paciente_vigente'),
 ): PacienteResource {
   if (!user) {
     throw new Error('La consulta de pacientes no incluyó el usuario asociado');
+  }
+  if (typeof roleActive !== 'boolean') {
+    throw new Error('La consulta de pacientes no incluyó el estado del rol paciente');
   }
   return {
     id: patient.id,
@@ -29,19 +33,26 @@ function toResource(
     nombre: user.nombre,
     apellido: user.apellido,
     fecha_nacimiento: patient.fecha_nacimiento,
-    activo: user.estado === 'activo',
+    activo: user.estado === 'activo' && roleActive,
     creado_en: patient.creado_en,
     actualizado_en: patient.actualizado_en,
   };
 }
 
 export function createPacienteService(models: ApplicationModels) {
-  const { Paciente, Usuario, Rol, UsuarioRol } = models;
+  const { Paciente, Usuario, Rol, UsuarioRol, Turno } = models;
   const database = Paciente.sequelize;
   if (!database) {
     throw new Error('El modelo de pacientes no tiene una conexión Sequelize');
   }
   const escapeValue = database.escape.bind(database);
+  const patientRoleExists = `EXISTS (
+    SELECT 1 FROM usuario_roles AS paciente_rol
+    INNER JOIN roles AS rol ON rol.id = paciente_rol.rol_id
+    WHERE paciente_rol.usuario_id = "Paciente"."usuario_id" AND rol.codigo = 'paciente'
+  )`;
+  const activeExpression = `("usuario"."estado" = 'activo' AND ${patientRoleExists})`;
+  const patientAttributes: FindAttributeOptions = { include: [[literal(patientRoleExists), 'rol_paciente_vigente']] };
 
   function accessWhere(identity: AuthIdentity): WhereOptions {
     if (identity.roles.includes('administrador')) {
@@ -77,9 +88,6 @@ export function createPacienteService(models: ApplicationModels) {
         ],
       });
     }
-    if (query.activo !== undefined) {
-      filters.push({ estado: query.activo ? 'activo' : 'inactivo' });
-    }
     return filters.length > 0 ? { [Op.and]: filters } : undefined;
   }
 
@@ -109,9 +117,14 @@ export function createPacienteService(models: ApplicationModels) {
   return {
     async list(query: PacienteListQuery, identity: AuthIdentity) {
       const result = await Paciente.findAndCountAll({
-        where: accessWhere(identity),
+        where: {
+          [Op.and]: [
+            accessWhere(identity),
+            ...(query.activo === undefined ? [] : [literal(query.activo ? activeExpression : `NOT ${activeExpression}`)]),
+          ],
+        },
         include: [includeUsuario(userWhere(query))],
-        attributes: ['id', 'usuario_id', 'fecha_nacimiento', 'creado_en', 'actualizado_en'],
+        attributes: patientAttributes,
         distinct: true,
         limit: query.limit,
         offset: (query.page - 1) * query.limit,
@@ -132,7 +145,7 @@ export function createPacienteService(models: ApplicationModels) {
       const patient = await Paciente.findOne({
         where: { [Op.and]: [{ id }, accessWhere(identity)] },
         include: [includeUsuario()],
-        attributes: ['id', 'usuario_id', 'fecha_nacimiento', 'creado_en', 'actualizado_en'],
+        attributes: patientAttributes,
       });
       return patient ? toResource(patient) : null;
     },
@@ -151,7 +164,7 @@ export function createPacienteService(models: ApplicationModels) {
         }
         const patient = await Paciente.findByPk(id, {
           include: [includeUsuario()],
-          attributes: ['id', 'usuario_id', 'fecha_nacimiento', 'creado_en', 'actualizado_en'],
+          attributes: patientAttributes,
           transaction,
         });
         if (!patient) {
@@ -195,7 +208,52 @@ export function createPacienteService(models: ApplicationModels) {
           await patient.update({ fecha_nacimiento: input.fecha_nacimiento }, { transaction });
         }
         await UsuarioRol.create({ usuario_id: user.id, rol_id: role.id }, { transaction });
-        return { patient: toResource(patient, user), created };
+        return { patient: toResource(patient, user, true), created };
+      });
+    },
+
+    async remove(id: string): Promise<boolean> {
+      return database.transaction(async (transaction) => {
+        const existing = await Paciente.findByPk(id, { transaction, attributes: ['id', 'usuario_id'] });
+        if (!existing) {
+          return false;
+        }
+        const user = await Usuario.findByPk(existing.usuario_id, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!user) {
+          throw new Error('El perfil de paciente no tiene usuario asociado');
+        }
+        const patient = await Paciente.findByPk(id, { transaction, lock: transaction.LOCK.UPDATE });
+        if (!patient || patient.usuario_id !== user.id) {
+          throw new Error('El perfil de paciente cambió durante la baja');
+        }
+        const role = await Rol.findOne({ where: { codigo: 'paciente' }, transaction });
+        if (!role) {
+          throw new HttpError(503, 'SERVICE_UNAVAILABLE', 'La baja de pacientes no está disponible temporalmente');
+        }
+        const assignment = await UsuarioRol.findOne({
+          where: { usuario_id: user.id, rol_id: role.id },
+          transaction,
+        });
+        if (!assignment) {
+          return true;
+        }
+        const pending = await Turno.findOne({
+          where: { paciente_id: id, estado: 'reservado', fin: { [Op.gt]: fn('NOW') } },
+          transaction,
+          attributes: ['id'],
+        });
+        if (pending) {
+          throw new HttpError(409, 'CONFLICT', 'El paciente tiene turnos reservados pendientes');
+        }
+        await assignment.destroy({ transaction });
+        const remainingRoles = await UsuarioRol.count({ where: { usuario_id: user.id }, transaction });
+        if (remainingRoles === 0 && user.estado !== 'inactivo') {
+          await user.update({ estado: 'inactivo' }, { transaction });
+        }
+        return true;
       });
     },
   };

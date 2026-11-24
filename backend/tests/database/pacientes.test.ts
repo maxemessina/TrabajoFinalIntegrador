@@ -169,6 +169,13 @@ async function patchPatient(id: string, body: unknown, token?: string): Promise<
   });
 }
 
+async function deletePatient(id: string, token?: string): Promise<Response> {
+  return fetch(`${baseUrl}/pacientes/${id}`, {
+    method: 'DELETE',
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+}
+
 async function createUserForWrite(active = true) {
   return Usuario.create({
     nombre: 'Alta',
@@ -392,5 +399,147 @@ test('un fallo al asignar el rol revierte la creación o modificación del perfi
   } finally {
     await database.query('DROP TRIGGER fail_patient_role_assignment ON usuario_roles');
     await database.query('DROP FUNCTION fail_patient_role_assignment()');
+  }
+});
+
+test('solo el administrador puede dar de baja y se validan los identificadores', async () => {
+  assert.equal((await deletePatient(ownPatientId)).status, 401);
+  assert.equal((await deletePatient(ownPatientId, patientToken)).status, 403);
+  assert.equal((await deletePatient(ownPatientId, professionalToken)).status, 403);
+  assert.equal((await deletePatient(ownPatientId, noRoleToken)).status, 403);
+  assert.equal((await deletePatient('invalido', adminToken)).status, 400);
+  assert.equal((await deletePatient(randomUUID(), adminToken)).status, 404);
+  const role = await Rol.findOne({ where: { codigo: 'paciente' } });
+  assert.ok(role);
+  const patient = await Paciente.findByPk(ownPatientId);
+  assert.ok(patient);
+  assert.equal(await UsuarioRol.count({ where: { usuario_id: patient.usuario_id, rol_id: role.id } }), 1);
+});
+
+test('la baja conserva el perfil, desactiva al usuario sin otros roles y es idempotente', async () => {
+  const user = await createUserForWrite();
+  const role = await Rol.findOne({ where: { codigo: 'paciente' } });
+  assert.ok(role);
+  const patient = await Paciente.create({ usuario_id: user.id, fecha_nacimiento: '1980-01-01' });
+  await UsuarioRol.create({ usuario_id: user.id, rol_id: role.id });
+  const token = await accessTokens.issue(user.id);
+  const deleted = await deletePatient(patient.id, adminToken);
+  assert.equal(deleted.status, 204);
+  assert.equal(await deleted.text(), '');
+  assert.equal(await UsuarioRol.count({ where: { usuario_id: user.id, rol_id: role.id } }), 0);
+  assert.equal((await Usuario.findByPk(user.id))?.estado, 'inactivo');
+  assert.equal((await Paciente.findByPk(patient.id))?.fecha_nacimiento, '1980-01-01');
+  assert.equal((await get(`/pacientes/${patient.id}`, token)).status, 401);
+  assert.equal((await deletePatient(patient.id, adminToken)).status, 204);
+
+  await user.reload();
+  await user.update({ estado: 'activo' });
+  const reactivated = await postPatient({ usuario_id: user.id }, adminToken);
+  assert.equal(reactivated.status, 200);
+  const result = await readJson<{ data: { id: string; activo: boolean; fecha_nacimiento: string | null } }>(reactivated);
+  assert.equal(result.data.id, patient.id);
+  assert.equal(result.data.activo, true);
+  assert.equal(result.data.fecha_nacimiento, '1980-01-01');
+});
+
+test('la baja de un usuario multirrol conserva sus otros roles y marca inactivo el perfil', async () => {
+  const user = await createUserForWrite();
+  const search = `SinRolPaciente${randomUUID().replaceAll('-', '')}`;
+  await user.update({ nombre: search });
+  const patient = await Paciente.create({ usuario_id: user.id, fecha_nacimiento: null });
+  const patientRole = await Rol.findOne({ where: { codigo: 'paciente' } });
+  const adminRole = await Rol.findOne({ where: { codigo: 'administrador' } });
+  assert.ok(patientRole);
+  assert.ok(adminRole);
+  await UsuarioRol.bulkCreate([
+    { usuario_id: user.id, rol_id: patientRole.id },
+    { usuario_id: user.id, rol_id: adminRole.id },
+  ]);
+  const userToken = await accessTokens.issue(user.id);
+  assert.equal((await deletePatient(patient.id, adminToken)).status, 204);
+  assert.equal((await Usuario.findByPk(user.id))?.estado, 'activo');
+  assert.equal(await UsuarioRol.count({ where: { usuario_id: user.id, rol_id: adminRole.id } }), 1);
+  const me = await get('/me', userToken);
+  assert.equal(me.status, 200);
+  assert.deepEqual((await readJson<{ data: { roles: string[] } }>(me)).data.roles, ['administrador']);
+  const detail = await get(`/pacientes/${patient.id}`, adminToken);
+  assert.equal((await readJson<{ data: { activo: boolean } }>(detail)).data.activo, false);
+  const active = await get(`/pacientes?q=${search}&activo=true`, adminToken);
+  const inactive = await get(`/pacientes?q=${search}&activo=false`, adminToken);
+  assert.equal((await readJson<{ meta: { total: number } }>(active)).meta.total, 0);
+  const inactiveResult = await readJson<{ data: Array<{ id: string; activo: boolean }>; meta: { total: number } }>(inactive);
+  assert.equal(inactiveResult.meta.total, 1);
+  assert.deepEqual(inactiveResult.data.map(({ id, activo }) => ({ id, activo })), [{ id: patient.id, activo: false }]);
+  const reactivated = await postPatient({ usuario_id: user.id }, adminToken);
+  assert.equal(reactivated.status, 200);
+  assert.equal((await readJson<{ data: { activo: boolean } }>(reactivated)).data.activo, true);
+});
+
+test('la baja rechaza turnos reservados pendientes y conserva los turnos históricos', async () => {
+  const user = await createUserForWrite();
+  const role = await Rol.findOne({ where: { codigo: 'paciente' } });
+  const professional = await Profesional.findOne();
+  assert.ok(role);
+  assert.ok(professional);
+  const patient = await Paciente.create({ usuario_id: user.id, fecha_nacimiento: null });
+  await UsuarioRol.create({ usuario_id: user.id, rol_id: role.id });
+  const now = Date.now();
+  await Turno.create({
+    paciente_id: patient.id, profesional_id: professional.id, estado: 'reservado', cancelado_en: null,
+    inicio: new Date(now - 2 * 60 * 60 * 1000), fin: new Date(now - 60 * 60 * 1000),
+  });
+  const pending = await Turno.create({
+    paciente_id: patient.id, profesional_id: professional.id, estado: 'reservado', cancelado_en: null,
+    inicio: new Date(now - 10 * 60 * 1000), fin: new Date(now + 10 * 60 * 1000),
+  });
+  assert.equal((await deletePatient(patient.id, adminToken)).status, 409);
+  assert.equal(await UsuarioRol.count({ where: { usuario_id: user.id, rol_id: role.id } }), 1);
+  assert.equal((await Usuario.findByPk(user.id))?.estado, 'activo');
+  await pending.update({ estado: 'atendido' });
+  assert.equal((await deletePatient(patient.id, adminToken)).status, 204);
+  assert.equal(await Turno.count({ where: { paciente_id: patient.id } }), 2);
+  assert.ok(await Paciente.findByPk(patient.id));
+});
+
+test('bajas concurrentes son idempotentes', async () => {
+  const user = await createUserForWrite();
+  const role = await Rol.findOne({ where: { codigo: 'paciente' } });
+  assert.ok(role);
+  const patient = await Paciente.create({ usuario_id: user.id, fecha_nacimiento: null });
+  await UsuarioRol.create({ usuario_id: user.id, rol_id: role.id });
+  const responses = await Promise.all([
+    deletePatient(patient.id, adminToken),
+    deletePatient(patient.id, adminToken),
+  ]);
+  assert.deepEqual(responses.map((response) => response.status), [204, 204]);
+  assert.equal(await UsuarioRol.count({ where: { usuario_id: user.id, rol_id: role.id } }), 0);
+  assert.equal((await Usuario.findByPk(user.id))?.estado, 'inactivo');
+});
+
+test('un fallo al desactivar el usuario revierte la baja del rol', async () => {
+  const user = await createUserForWrite();
+  const role = await Rol.findOne({ where: { codigo: 'paciente' } });
+  assert.ok(role);
+  const patient = await Paciente.create({ usuario_id: user.id, fecha_nacimiento: null });
+  await UsuarioRol.create({ usuario_id: user.id, rol_id: role.id });
+  await database.query(`
+    CREATE FUNCTION fail_patient_deactivation() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.id = '${user.id}'::uuid AND NEW.estado = 'inactivo' THEN
+        RAISE EXCEPTION 'fallo de prueba';
+      END IF;
+      RETURN NEW;
+    END $$`);
+  await database.query(`
+    CREATE TRIGGER fail_patient_deactivation
+    BEFORE UPDATE ON usuarios
+    FOR EACH ROW EXECUTE FUNCTION fail_patient_deactivation()`);
+  try {
+    assert.equal((await deletePatient(patient.id, adminToken)).status, 500);
+    assert.equal(await UsuarioRol.count({ where: { usuario_id: user.id, rol_id: role.id } }), 1);
+    assert.equal((await Usuario.findByPk(user.id))?.estado, 'activo');
+  } finally {
+    await database.query('DROP TRIGGER fail_patient_deactivation ON usuarios');
+    await database.query('DROP FUNCTION fail_patient_deactivation()');
   }
 });

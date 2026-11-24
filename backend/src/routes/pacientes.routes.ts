@@ -21,6 +21,7 @@ export function createUnavailablePacientesRouter() {
   router.get('/pacientes/:id', unavailable);
   router.post('/pacientes', unavailable);
   router.patch('/pacientes/:id', unavailable);
+  router.delete('/pacientes/:id', unavailable);
   return router;
 }
 
@@ -67,6 +68,13 @@ export function createPacientesRouter(dependencies: PacienteRouteDependencies) {
       throw new HttpError(404, 'NOT_FOUND', 'Paciente no encontrado');
     }
     response.status(200).json({ data: patient });
+  });
+
+  router.delete('/pacientes/:id', authenticate, requireRoles('administrador'), async (request, response) => {
+    if (!await pacientes.remove(parsePacienteId(request.params.id))) {
+      throw new HttpError(404, 'NOT_FOUND', 'Paciente no encontrado');
+    }
+    response.status(204).end();
   });
 
   return router;
