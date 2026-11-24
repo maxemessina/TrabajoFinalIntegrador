@@ -1,6 +1,6 @@
 # Backend
 
-Base de la API con Node.js, TypeScript y Express. Incluye la conexión PostgreSQL con Sequelize, el ejecutor de migraciones y el modelo inicial de usuarios; todavía no hay datos demo ni endpoints de dominio.
+Base de la API con Node.js, TypeScript y Express. Incluye la conexión PostgreSQL con Sequelize, el ejecutor de migraciones y los modelos iniciales de usuarios y roles; todavía no hay datos demo ni endpoints de dominio.
 
 ## Arquitectura inicial
 
@@ -10,7 +10,7 @@ backend/
     app.ts                 Aplicación y montaje de rutas y middlewares
     server.ts              Arranque HTTP
     config.ts              Variables de entorno
-    models/                Modelos y futuras asociaciones Sequelize
+    models/                Modelos y asociaciones Sequelize
     routes/                Endpoints HTTP
     schemas/               Futura validación de solicitudes
     services/              Futura lógica de negocio
@@ -30,7 +30,7 @@ backend/
 
 Las rutas reciben las solicitudes, utilizarán los esquemas para validarlas y delegarán la lógica a los servicios. Los archivos de rutas utilizan el sufijo `.routes.ts`; modelos y servicios, `.ts`; esquemas, `.schema.ts`. Si una ruta necesita un controlador separado, podrá agregarse sin obligar a usarlo en todas. Las carpetas vacías contienen `.gitkeep`, no código funcional.
 
-Las migraciones serán la fuente de verdad del esquema; los modelos deberán reflejarlas, según el [DER](../DER.md). No se incluyen aún funcionalidades específicas para preservar la distribución de tareas del equipo.
+Las migraciones serán la fuente de verdad del esquema; los modelos deberán reflejarlas, según el [DER](../docs/DER.md). No se incluyen aún funcionalidades específicas para preservar la distribución de tareas del equipo.
 
 ## Instalación y ejecución
 
@@ -80,7 +80,9 @@ npm run db:migrate
 
 La primera migración crea `usuarios`, con UUID, timestamps, estado validado y email único sin distinguir mayúsculas. No crea usuarios de demostración. Las migraciones registradas se aplican en orden en una transacción, con bloqueo para evitar ejecuciones simultáneas; su historial queda en `schema_migrations`. Repetir el comando no vuelve a ejecutarlas. Un fallo revierte la aplicación y se informa; si el historial no coincide con esta versión del proyecto, el comando se detiene.
 
-Agregar futuras migraciones a `src/database/migrations/` y registrarlas al final de la lista en `src/database/migrator.ts`, con nombres crecientes y únicos. No modificar ni renombrar migraciones ya aplicadas: agregar otra. No usar `sequelize.sync()` para crear el esquema de la aplicación. La API aún no usa el modelo; las respuestas futuras nunca deben exponer `password_hash`.
+La segunda migración crea `roles` y `usuario_roles` y carga los códigos fijos `paciente`, `profesional` y `administrador`. Un usuario puede tener varios roles, sin asignaciones duplicadas; las referencias restringen el borrado físico de usuarios y roles asignados. Estos códigos son datos del sistema, no usuarios de demostración.
+
+Agregar futuras migraciones a `src/database/migrations/` y registrarlas al final de la lista en `src/database/migrator.ts`, con nombres crecientes y únicos. No modificar ni renombrar migraciones ya aplicadas: agregar otra. No usar `sequelize.sync()` para crear el esquema de la aplicación. `defineModels` inicializa los modelos y sus asociaciones para una conexión Sequelize. La API aún no usa estos modelos; las respuestas futuras nunca deben exponer `password_hash`.
 
 Para producción, configurar una conexión cifrada y certificados verificados de acuerdo con el proveedor PostgreSQL antes de desplegar; no desactivar la verificación de certificados. La configuración de despliegue se completará en PGSI-20.
 

@@ -2,7 +2,7 @@
 
 ## 1. Alcance y estado
 
-Propuesta para PGSI-2, a revisar por Máximo, Priscila y Valentina en el PR a `dev`. Es el acuerdo para implementar frontend, mocks y API; **no indica que los endpoints ya existan**. El [DER](../DER.md) es la referencia de persistencia y sus restricciones. Si una revisión cambia una decisión compartida, actualizar ambos documentos y los consumidores afectados.
+Propuesta para PGSI-2, a revisar por Máximo, Priscila y Valentina en el PR a `dev`. Es el acuerdo para implementar frontend, mocks y API; **no indica que los endpoints ya existan**. El [DER](DER.md) es la referencia de persistencia y sus restricciones. Si una revisión cambia una decisión compartida, actualizar ambos documentos y los consumidores afectados.
 
 La única ruta implementada al crear este documento es `GET /api/v1/health`. Autenticación, modelos, operaciones de negocio y persistencia corresponden a sus tickets. En el perfil de evaluación PGSI-29 los datos son ficticios y las escrituras se simulan en memoria, sin escribir en PostgreSQL; el perfil final usa persistencia real. Ambos perfiles respetan los mismos métodos, permisos, estados y formas de respuesta.
 
@@ -91,7 +91,7 @@ Para no dejar turnos sin un titular habilitado, desactivar un usuario o retirar 
 
 ## 4. Entidades del DER y representación
 
-Las 17 entidades están definidas en el [diccionario del DER](../DER.md#4-diccionario-de-datos). La siguiente tabla fija sus claves, relaciones y exposición para la API; las validaciones y restricciones de integridad del DER siguen aplicando.
+Las 17 entidades están definidas en el [diccionario del DER](DER.md#4-diccionario-de-datos). La siguiente tabla fija sus claves, relaciones y exposición para la API; las validaciones y restricciones de integridad del DER siguen aplicando.
 
 | Entidad | PK; FK principales | Exposición |
 |---|---|---|

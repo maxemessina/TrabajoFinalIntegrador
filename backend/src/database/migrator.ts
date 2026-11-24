@@ -1,6 +1,7 @@
 import { QueryTypes } from 'sequelize';
 import type { QueryInterface, Sequelize, Transaction } from 'sequelize';
 import { createUsuarios } from './migrations/001_create_usuarios.ts';
+import { createRoles } from './migrations/002_create_roles.ts';
 
 type Migration = {
   name: string;
@@ -9,6 +10,7 @@ type Migration = {
 
 const migrations: readonly Migration[] = [
   { name: '001_create_usuarios', up: createUsuarios },
+  { name: '002_create_roles', up: createRoles },
 ];
 
 export class MigrationStateError extends Error {
