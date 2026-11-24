@@ -12,7 +12,7 @@ Portal para buscar profesionales por zona y especialidad, gestionar turnos y aco
 - `postman/`: futura colección de pruebas de la API.
 - [DER.md](docs/DER.md): propuesta de modelo de datos para PostgreSQL.
 
-El backend cuenta con un servidor inicial, una ruta de salud y la base de persistencia PostgreSQL con Sequelize: conexión, migraciones y modelos iniciales de usuarios y roles. Aún no implementa endpoints de dominio ni datos demo. El frontend todavía no está implementado. Para el prototipo se usarán respuestas simuladas sin escrituras persistentes; la aplicación final utilizará PostgreSQL y Sequelize.
+El backend cuenta con un servidor inicial, una ruta de salud y la base de persistencia PostgreSQL con Sequelize: conexión, migraciones y modelos iniciales de usuarios, roles y pacientes. Aún no implementa endpoints de dominio ni datos demo. El frontend todavía no está implementado. Para el prototipo se usarán respuestas simuladas sin escrituras persistentes; la aplicación final utilizará PostgreSQL y Sequelize.
 
 El repositorio es público: utilizar únicamente datos ficticios y no versionar datos de pacientes ni credenciales.
 

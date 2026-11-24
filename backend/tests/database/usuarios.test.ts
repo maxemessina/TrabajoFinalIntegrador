@@ -1,6 +1,6 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DatabaseError, ForeignKeyConstraintError, UniqueConstraintError } from 'sequelize';
+import { DatabaseError, ForeignKeyConstraintError, QueryTypes, UniqueConstraintError } from 'sequelize';
 import { createDatabase, readDatabaseUrl } from '../../src/database/connection.ts';
 import { runMigrations } from '../../src/database/migrator.ts';
 import { defineModels } from '../../src/models/index.ts';
@@ -10,11 +10,11 @@ if (!process.env.TEST_DATABASE_URL) {
 }
 
 const database = createDatabase(readDatabaseUrl({ DATABASE_URL: process.env.TEST_DATABASE_URL }));
-const { Usuario, Rol, UsuarioRol } = defineModels(database);
+const { Usuario, Rol, UsuarioRol, Paciente } = defineModels(database);
 
 before(async () => {
   const results = await Promise.all([runMigrations(database), runMigrations(database)]);
-  for (const name of ['001_create_usuarios', '002_create_roles']) {
+  for (const name of ['001_create_usuarios', '002_create_roles', '003_create_pacientes']) {
     assert.ok(results.flat().filter((applied) => applied === name).length <= 1);
   }
 });
@@ -32,6 +32,7 @@ test('los modelos coinciden con las columnas y claves de sus tablas', async () =
     ['usuarios', Object.entries(Usuario.getAttributes())],
     ['roles', Object.entries(Rol.getAttributes())],
     ['usuario_roles', Object.entries(UsuarioRol.getAttributes())],
+    ['pacientes', Object.entries(Paciente.getAttributes())],
   ] as const;
   for (const [table, attributes] of models) {
     const columns = await database.getQueryInterface().describeTable(table);
@@ -226,3 +227,98 @@ for (const target of ['usuario', 'rol'] as const) {
     }
   });
 }
+
+test('un perfil admite fecha de hoy o nula y se consulta desde ambas asociaciones', async () => {
+  const transaction = await database.transaction();
+  try {
+    const data = { nombre: 'Ana', apellido: 'Ejemplo', password_hash: 'hash-ficticio' };
+    const user = await Usuario.create({ ...data, email: 'paciente@example.invalid' }, { transaction });
+    const other = await Usuario.create({ ...data, email: 'paciente2@example.invalid' }, { transaction });
+    const [date] = await database.query<{ hoy: string }>('SELECT CURRENT_DATE::text AS hoy', {
+      type: QueryTypes.SELECT,
+      transaction,
+    });
+    assert.ok(date);
+    const patient = await Paciente.create({ usuario_id: user.id, fecha_nacimiento: date.hoy }, { transaction });
+    const withoutDate = await Paciente.create({ usuario_id: other.id }, { transaction });
+    assert.equal(withoutDate.fecha_nacimiento, null);
+    assert.equal(patient.fecha_nacimiento, date.hoy);
+    assert.ok(patient.creado_en instanceof Date);
+    assert.ok(patient.actualizado_en instanceof Date);
+    const linkedPatient = await Paciente.findOne({
+      where: { id: patient.id },
+      include: [{ model: Usuario, as: 'usuario', where: { id: user.id } }],
+      transaction,
+    });
+    const linkedUser = await Usuario.findOne({
+      where: { id: user.id },
+      include: [{ model: Paciente, as: 'paciente', where: { id: patient.id } }],
+      transaction,
+    });
+    assert.ok(linkedPatient);
+    assert.ok(linkedUser);
+  } finally {
+    await transaction.rollback();
+  }
+});
+
+test('un usuario no puede tener dos perfiles de paciente', async () => {
+  const transaction = await database.transaction();
+  try {
+    const user = await Usuario.create({
+      nombre: 'Ana', apellido: 'Ejemplo', email: 'paciente@example.invalid', password_hash: 'hash-ficticio',
+    }, { transaction });
+    await Paciente.create({ usuario_id: user.id }, { transaction });
+    await assert.rejects(Paciente.create({ usuario_id: user.id }, { transaction }), UniqueConstraintError);
+  } finally {
+    await transaction.rollback();
+  }
+});
+
+test('un perfil de paciente requiere un usuario existente', async () => {
+  const transaction = await database.transaction();
+  try {
+    await assert.rejects(
+      Paciente.create({ usuario_id: '11111111-1111-4111-8111-111111111111' }, { transaction }),
+      ForeignKeyConstraintError,
+    );
+  } finally {
+    await transaction.rollback();
+  }
+});
+
+test('la base rechaza fechas de nacimiento futuras', async () => {
+  const transaction = await database.transaction();
+  try {
+    const user = await Usuario.create({
+      nombre: 'Ana', apellido: 'Ejemplo', email: 'paciente@example.invalid', password_hash: 'hash-ficticio',
+    }, { transaction });
+    await assert.rejects(
+      database.query('INSERT INTO pacientes (usuario_id, fecha_nacimiento) VALUES ($1, CURRENT_DATE + 1)', {
+        bind: [user.id], transaction,
+      }),
+      (error: unknown) => error instanceof DatabaseError &&
+        typeof error.parent === 'object' && 'code' in error.parent && error.parent.code === '23514',
+    );
+  } finally {
+    await transaction.rollback();
+  }
+});
+
+test('no puede borrarse físicamente un usuario con perfil de paciente', async () => {
+  const transaction = await database.transaction();
+  try {
+    const user = await Usuario.create({
+      nombre: 'Ana', apellido: 'Ejemplo', email: 'paciente@example.invalid', password_hash: 'hash-ficticio',
+    }, { transaction });
+    await Paciente.create({ usuario_id: user.id }, { transaction });
+    await assert.rejects(
+      Usuario.destroy({ where: { id: user.id }, transaction }),
+      (error: unknown) => error instanceof DatabaseError &&
+        typeof error.parent === 'object' && 'code' in error.parent &&
+        (error.parent.code === '23001' || error.parent.code === '23503'),
+    );
+  } finally {
+    await transaction.rollback();
+  }
+});
