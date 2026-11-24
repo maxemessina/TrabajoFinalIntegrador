@@ -11,6 +11,7 @@ import { createEventosVisita } from './migrations/008_create_eventos_visita.ts';
 import { createTurnos } from './migrations/009_create_turnos.ts';
 import { createNotificaciones } from './migrations/010_create_notificaciones.ts';
 import { createFichasClinicas } from './migrations/011_create_fichas_clinicas.ts';
+import { createNotasClinicas } from './migrations/012_create_notas_clinicas.ts';
 
 type Migration = {
   name: string;
@@ -29,6 +30,7 @@ const migrations: readonly Migration[] = [
   { name: '009_create_turnos', up: createTurnos },
   { name: '010_create_notificaciones', up: createNotificaciones },
   { name: '011_create_fichas_clinicas', up: createFichasClinicas },
+  { name: '012_create_notas_clinicas', up: createNotasClinicas },
 ];
 
 export class MigrationStateError extends Error {

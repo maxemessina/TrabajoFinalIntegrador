@@ -125,6 +125,8 @@ erDiagram
         uuid id PK
         uuid ficha_id FK
         uuid turno_id FK
+        uuid paciente_id FK
+        uuid profesional_id FK
         text contenido
     }
     NOTIFICACIONES {
@@ -334,9 +336,10 @@ Restricción única (`paciente_id`, `profesional_id`). Se propone crear la ficha
 | `id` | UUID | PK. |
 | `ficha_id` | UUID | FK → `fichas_clinicas.id`. |
 | `turno_id` | UUID | FK opcional → `turnos.id`; si existe, debe corresponder al mismo paciente y profesional que la ficha. |
+| `paciente_id`, `profesional_id` | UUID | Obligatorios; copias técnicas de los titulares de la ficha para reforzar integridad con claves foráneas compuestas. |
 | `contenido` | text | Obligatorio; evolución o nota clínica. |
 
-El backend debe garantizar la correspondencia ficha/turno, idealmente reforzada con claves compuestas y FKs en la migración. El profesional dueño de la ficha es el autor responsable en este diseño; registrar auditoría de cambios antes de habilitar edición o eliminación clínica en producción.
+Las FKs compuestas (`ficha_id`, `paciente_id`, `profesional_id`) y (`turno_id`, `paciente_id`, `profesional_id`) garantizan la correspondencia; la segunda permite `turno_id` nulo. El servicio debe obtener los titulares de la ficha, no confiar en valores suministrados por el cliente, y validar permisos y estado del turno. El profesional dueño de la ficha es el autor responsable en este diseño; registrar auditoría de cambios antes de habilitar edición o eliminación clínica en producción.
 
 ### 4.5. Notificaciones y métricas
 
