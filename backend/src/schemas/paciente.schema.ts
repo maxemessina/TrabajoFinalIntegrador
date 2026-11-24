@@ -93,25 +93,30 @@ export function parsePacienteListQuery(value: unknown): PacienteListQuery {
   };
 }
 
-export function parsePacienteId(value: string): string {
-  if (!uuidPattern.test(value)) {
+export function parsePacienteId(value: unknown): string {
+  if (typeof value !== 'string' || !uuidPattern.test(value)) {
     return invalid('id', 'Debe ser un UUID válido');
   }
   return value;
 }
 
-export function parsePacienteCreate(value: unknown): { usuario_id: string; fecha_nacimiento?: string | null } {
+function pacienteBody(value: unknown, allowed: readonly string[]): Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     throw new HttpError(400, 'VALIDATION_ERROR', 'Los datos enviados no son válidos');
   }
   const body = value as Record<string, unknown>;
-  const unknown = Object.keys(body).filter((field) => !['usuario_id', 'fecha_nacimiento'].includes(field));
+  const unknown = Object.keys(body).filter((field) => !allowed.includes(field));
   if (unknown.length > 0) {
     throw new HttpError(400, 'VALIDATION_ERROR', 'Los datos enviados no son válidos', unknown.map((field) => ({
       field,
       message: 'Campo desconocido',
     })));
   }
+  return body;
+}
+
+export function parsePacienteCreate(value: unknown): { usuario_id: string; fecha_nacimiento?: string | null } {
+  const body = pacienteBody(value, ['usuario_id', 'fecha_nacimiento']);
   const userId = body.usuario_id;
   if (typeof userId !== 'string' || !uuidPattern.test(userId)) {
     throw new HttpError(400, 'VALIDATION_ERROR', 'Los datos enviados no son válidos', [
@@ -123,4 +128,15 @@ export function parsePacienteCreate(value: unknown): { usuario_id: string; fecha
     usuario_id: userId,
     ...(birthDate !== undefined ? { fecha_nacimiento: birthDate } : {}),
   };
+}
+
+export function parsePacienteUpdate(value: unknown): { fecha_nacimiento: string | null } {
+  const body = pacienteBody(value, ['fecha_nacimiento']);
+  const birthDate = birthDateField(body);
+  if (birthDate === undefined) {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Los datos enviados no son válidos', [
+      { field: 'fecha_nacimiento', message: 'Debe proporcionar una fecha o null' },
+    ]);
+  }
+  return { fecha_nacimiento: birthDate };
 }

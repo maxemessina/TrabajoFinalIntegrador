@@ -158,6 +158,17 @@ async function postPatient(body: unknown, token?: string): Promise<Response> {
   });
 }
 
+async function patchPatient(id: string, body: unknown, token?: string): Promise<Response> {
+  return fetch(`${baseUrl}/pacientes/${id}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
 async function createUserForWrite(active = true) {
   return Usuario.create({
     nombre: 'Alta',
@@ -242,6 +253,43 @@ test('profesionales solo consultan pacientes con turno no cancelado compartido',
 test('la autenticación y los roles distinguen 401 de 403', async () => {
   assert.equal((await get('/pacientes')).status, 401);
   assert.equal((await get('/pacientes', noRoleToken)).status, 403);
+});
+
+test('el paciente edita únicamente su perfil y el administrador puede editar otros', async () => {
+  const changed = await patchPatient(ownPatientId, { fecha_nacimiento: '1995-02-10' }, patientToken);
+  assert.equal(changed.status, 200);
+  const result = await readJson<{ data: Record<string, unknown> }>(changed);
+  assert.equal(result.data.id, ownPatientId);
+  assert.equal(result.data.fecha_nacimiento, '1995-02-10');
+  assert.equal('email' in result.data, false);
+  assert.equal((await Paciente.findByPk(ownPatientId))?.fecha_nacimiento, '1995-02-10');
+
+  const cleared = await patchPatient(ownPatientId, { fecha_nacimiento: null }, patientToken);
+  assert.equal(cleared.status, 200);
+  assert.equal((await readJson<{ data: { fecha_nacimiento: string | null } }>(cleared)).data.fecha_nacimiento, null);
+  assert.equal((await Paciente.findByPk(ownPatientId))?.fecha_nacimiento, null);
+
+  const adminUpdate = await patchPatient(unrelatedPatientId, { fecha_nacimiento: '1987-05-01' }, adminToken);
+  assert.equal(adminUpdate.status, 200);
+  assert.equal((await readJson<{ data: { fecha_nacimiento: string | null } }>(adminUpdate)).data.fecha_nacimiento, '1987-05-01');
+  assert.equal((await Paciente.findByPk(unrelatedPatientId))?.fecha_nacimiento, '1987-05-01');
+});
+
+test('la edición impide accesos ajenos y rechaza cuerpos o identificadores inválidos', async () => {
+  const initial = await Paciente.findByPk(linkedPatientId);
+  assert.ok(initial);
+  const body = { fecha_nacimiento: '1988-01-01' };
+  assert.equal((await patchPatient(linkedPatientId, body)).status, 401);
+  assert.equal((await patchPatient(linkedPatientId, body, noRoleToken)).status, 403);
+  assert.equal((await patchPatient(linkedPatientId, body, professionalToken)).status, 403);
+  assert.equal((await patchPatient(linkedPatientId, body, patientToken)).status, 404);
+  assert.equal((await patchPatient(randomUUID(), body, adminToken)).status, 404);
+  assert.equal((await patchPatient('invalido', body, adminToken)).status, 400);
+  for (const invalidBody of [{}, { fecha_nacimiento: '9999-01-01' }, { nombre: 'Otro' }, { fecha_nacimiento: null, usuario_id: randomUUID() }]) {
+    assert.equal((await patchPatient(linkedPatientId, invalidBody, adminToken)).status, 400);
+  }
+  await initial.reload();
+  assert.equal(initial.fecha_nacimiento, '1990-01-01');
 });
 
 test('el administrador crea el perfil y asigna el rol en una transacción', async () => {

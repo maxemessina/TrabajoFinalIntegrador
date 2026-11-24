@@ -137,6 +137,30 @@ export function createPacienteService(models: ApplicationModels) {
       return patient ? toResource(patient) : null;
     },
 
+    async update(id: string, input: { fecha_nacimiento: string | null }, identity: AuthIdentity) {
+      return database.transaction(async (transaction) => {
+        const [count] = await Paciente.update(input, {
+          where: {
+            id,
+            ...(identity.roles.includes('administrador') ? {} : { usuario_id: identity.userId }),
+          },
+          transaction,
+        });
+        if (count === 0) {
+          return null;
+        }
+        const patient = await Paciente.findByPk(id, {
+          include: [includeUsuario()],
+          attributes: ['id', 'usuario_id', 'fecha_nacimiento', 'creado_en', 'actualizado_en'],
+          transaction,
+        });
+        if (!patient) {
+          throw new Error('No se pudo consultar el perfil de paciente actualizado');
+        }
+        return toResource(patient);
+      });
+    },
+
     async create(input: { usuario_id: string; fecha_nacimiento?: string | null }) {
       return database.transaction(async (transaction) => {
         const user = await Usuario.findByPk(input.usuario_id, {

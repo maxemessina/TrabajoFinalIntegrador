@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HttpError } from '../../src/http-error.ts';
-import { parsePacienteCreate, parsePacienteId, parsePacienteListQuery } from '../../src/schemas/paciente.schema.ts';
+import { parsePacienteCreate, parsePacienteId, parsePacienteListQuery, parsePacienteUpdate } from '../../src/schemas/paciente.schema.ts';
 
 test('la lista de pacientes aplica valores predeterminados y normaliza filtros', () => {
   assert.deepEqual(parsePacienteListQuery({}), {
@@ -65,6 +65,18 @@ test('el alta rechaza identificador, fecha y campos inválidos', () => {
     { usuario_id, fecha_nacimiento: 5 },
   ]) {
     assert.throws(() => parsePacienteCreate(body), (error: unknown) =>
+      error instanceof HttpError && error.status === 400);
+  }
+});
+
+test('la edición admite solo una fecha válida no futura o null', () => {
+  assert.deepEqual(parsePacienteUpdate({ fecha_nacimiento: '2000-02-29' }), { fecha_nacimiento: '2000-02-29' });
+  assert.deepEqual(parsePacienteUpdate({ fecha_nacimiento: null }), { fecha_nacimiento: null });
+  for (const body of [
+    null, [], {}, { nombre: 'Otro' }, { fecha_nacimiento: '2001-02-29' },
+    { fecha_nacimiento: '9999-01-01' }, { fecha_nacimiento: 5 }, { fecha_nacimiento: null, usuario_id: 'otro' },
+  ]) {
+    assert.throws(() => parsePacienteUpdate(body), (error: unknown) =>
       error instanceof HttpError && error.status === 400);
   }
 });

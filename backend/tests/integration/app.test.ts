@@ -53,6 +53,8 @@ test('sin base configurada auth devuelve 503 y health sigue disponible', async (
   });
   const patientCreate = await fetch(`${baseUrl}/api/v1/pacientes`, { method: 'POST' });
   assert.equal(patientCreate.status, 503);
+  const patientUpdate = await fetch(`${baseUrl}/api/v1/pacientes/11111111-1111-4111-8111-111111111111`, { method: 'PATCH' });
+  assert.equal(patientUpdate.status, 503);
 });
 
 test('CORS permite el origen configurado incluso en preflight', async () => {
