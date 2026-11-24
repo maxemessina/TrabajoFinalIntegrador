@@ -5,6 +5,7 @@ import { createRoles } from './migrations/002_create_roles.ts';
 import { createPacientes } from './migrations/003_create_pacientes.ts';
 import { createCatalogos } from './migrations/004_create_catalogos.ts';
 import { createProfesionales } from './migrations/005_create_profesionales.ts';
+import { createAgenda } from './migrations/006_create_agenda.ts';
 
 type Migration = {
   name: string;
@@ -17,6 +18,7 @@ const migrations: readonly Migration[] = [
   { name: '003_create_pacientes', up: createPacientes },
   { name: '004_create_catalogos', up: createCatalogos },
   { name: '005_create_profesionales', up: createProfesionales },
+  { name: '006_create_agenda', up: createAgenda },
 ];
 
 export class MigrationStateError extends Error {

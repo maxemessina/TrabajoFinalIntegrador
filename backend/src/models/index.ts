@@ -1,5 +1,7 @@
 import type { Sequelize } from 'sequelize';
+import { defineBloqueoAgenda } from './BloqueoAgenda.ts';
 import { defineEspecialidad } from './Especialidad.ts';
+import { defineHorarioAtencion } from './HorarioAtencion.ts';
 import { definePaciente } from './Paciente.ts';
 import { defineProfesional } from './Profesional.ts';
 import { defineProfesionalEspecialidad } from './ProfesionalEspecialidad.ts';
@@ -19,6 +21,8 @@ export function defineModels(database: Sequelize) {
   const Profesional = defineProfesional(database);
   const ProfesionalEspecialidad = defineProfesionalEspecialidad(database);
   const TrabajoProfesional = defineTrabajoProfesional(database);
+  const HorarioAtencion = defineHorarioAtencion(database);
+  const BloqueoAgenda = defineBloqueoAgenda(database);
 
   Usuario.belongsToMany(Rol, {
     as: 'roles',
@@ -76,6 +80,21 @@ export function defineModels(database: Sequelize) {
   TrabajoProfesional.belongsTo(Profesional, {
     as: 'profesional', foreignKey: 'profesional_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
   });
+  Profesional.hasMany(HorarioAtencion, {
+    as: 'horarios', foreignKey: 'profesional_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  HorarioAtencion.belongsTo(Profesional, {
+    as: 'profesional', foreignKey: 'profesional_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  Profesional.hasMany(BloqueoAgenda, {
+    as: 'bloqueos', foreignKey: 'profesional_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  BloqueoAgenda.belongsTo(Profesional, {
+    as: 'profesional', foreignKey: 'profesional_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
 
-  return { Usuario, Rol, UsuarioRol, Paciente, Zona, Especialidad, Profesional, ProfesionalEspecialidad, TrabajoProfesional };
+  return {
+    Usuario, Rol, UsuarioRol, Paciente, Zona, Especialidad, Profesional, ProfesionalEspecialidad, TrabajoProfesional,
+    HorarioAtencion, BloqueoAgenda,
+  };
 }

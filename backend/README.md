@@ -88,6 +88,8 @@ La cuarta migración crea los catálogos `zonas` y `especialidades`, sin cargarl
 
 La quinta migración crea perfiles de `profesionales`, sus asociaciones con especialidades y sus trabajos. Cada perfil requiere un usuario y una zona, matrícula única y duración positiva; los perfiles y trabajos son invisibles por defecto. El servicio futuro deberá validar la zona horaria IANA, los permisos, la vigencia del rol y las condiciones para publicar, incluida una especialidad activa. Crear un perfil no asigna el rol ni lo publica.
 
+La sexta migración crea `horarios_atencion` y `bloqueos_agenda`, vinculados a profesionales. Valida día semanal, orden de horas y fechas de vigencia, e intervalos de bloqueo; los horarios están activos por defecto. La prevención de solapamientos, los permisos y la coordinación transaccional con turnos quedan para los servicios de PGSI-8 y PGSI-9; estas tablas por sí solas no calculan disponibilidad. El motivo del bloqueo es privado.
+
 Agregar futuras migraciones a `src/database/migrations/` y registrarlas al final de la lista en `src/database/migrator.ts`, con nombres crecientes y únicos. No modificar ni renombrar migraciones ya aplicadas: agregar otra. No usar `sequelize.sync()` para crear el esquema de la aplicación. `defineModels` inicializa los modelos y sus asociaciones para una conexión Sequelize. La API aún no usa estos modelos; las respuestas futuras nunca deben exponer `password_hash`.
 
 Para producción, configurar una conexión cifrada y certificados verificados de acuerdo con el proveedor PostgreSQL antes de desplegar; no desactivar la verificación de certificados. La configuración de despliegue se completará en PGSI-20.
