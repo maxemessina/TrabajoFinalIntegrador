@@ -44,6 +44,20 @@ jobs:
     strategy:
       matrix:
         node: ['22.18.0', '24']
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: pgsi_ci
+          POSTGRES_PASSWORD: pgsi_ci_only
+          POSTGRES_DB: pgsi_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U pgsi_ci -d pgsi_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: backend
@@ -59,3 +73,6 @@ jobs:
       - run: npm run build
       - run: npm run typecheck
       - run: npm test
+      - run: npm run db:check
+        env:
+          DATABASE_URL: postgres://pgsi_ci:pgsi_ci_only@127.0.0.1:5432/pgsi_ci

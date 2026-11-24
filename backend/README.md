@@ -1,6 +1,6 @@
 # Backend
 
-Base de la API con Node.js, TypeScript y Express. Todavía no incluye módulos de dominio, autenticación, Sequelize ni conexión a PostgreSQL.
+Base de la API con Node.js, TypeScript y Express. La conexión PostgreSQL con Sequelize puede verificarse por separado; todavía no hay modelos, migraciones, datos demo ni módulos de dominio.
 
 ## Arquitectura inicial
 
@@ -16,6 +16,8 @@ backend/
     services/              Futura lógica de negocio
     middleware/            Middlewares compartidos
     database/
+      connection.ts        Configuración de Sequelize para PostgreSQL
+      check.ts             Comprobación explícita de conectividad
       migrations/          Futuras migraciones de PostgreSQL
       seeders/             Futuros datos iniciales o de demostración
   tests/
@@ -47,8 +49,27 @@ La configuración se lee del `.env` en la raíz, independientemente del director
 | `NODE_ENV` | `development`, `test` o `production`; por defecto `development`. |
 | `PORT` | Puerto TCP entre 1 y 65535; por defecto `3000`. |
 | `CORS_ORIGIN` | Un único origen permitido, sin ruta ni barra final. En desarrollo por defecto es `http://localhost:5173`; en producción es obligatorio configurarlo explícitamente. |
+| `DATABASE_URL` | URL de PostgreSQL para los comandos de base de datos. No es necesaria para arrancar la API actual; se exige al verificar la conexión. |
 
 CORS controla qué respuestas puede leer un navegador desde otro origen; no sustituye autenticación ni autorización.
+
+## Conexión a PostgreSQL
+
+Instalar PostgreSQL y crear una base local vacía con un usuario autorizado. En el `.env` de la raíz, completar `DATABASE_URL` con una URL `postgres://` o `postgresql://` que incluya host y nombre de base. Ejemplo de formato, con marcadores que deben reemplazarse localmente:
+
+```text
+DATABASE_URL=postgres://USUARIO:CONTRASENA@localhost:5432/portal_salud
+```
+
+Codificar los caracteres especiales del usuario o contraseña como componentes de URL. No versionar credenciales reales. Desde `backend/`, ejecutar:
+
+```sh
+npm run db:check
+```
+
+El comando verifica la conexión con Sequelize y cierra el pool; devuelve un error y código de salida distinto de cero si falla. No crea tablas, migra ni carga datos. La API y `health` todavía no se conectan automáticamente a PostgreSQL; esto conserva el arranque existente y no implementa aún el perfil mock ni la persistencia final.
+
+Para producción, configurar una conexión cifrada y certificados verificados de acuerdo con el proveedor PostgreSQL antes de desplegar; no desactivar la verificación de certificados. La configuración de despliegue se completará en PGSI-20.
 
 ## Comprobaciones
 
@@ -61,7 +82,7 @@ npm run typecheck
 npm test
 ```
 
-La CI ejecuta estas comprobaciones con Node.js 22.18 y 24. `typecheck` también verifica los tipos de las pruebas; `build` genera la aplicación en `dist/`.
+La CI ejecuta estas comprobaciones con Node.js 22.18 y 24 y verifica la conexión contra un PostgreSQL temporal. `typecheck` también verifica los tipos de las pruebas; `build` genera la aplicación en `dist/`.
 
 ## Respuestas iniciales
 
