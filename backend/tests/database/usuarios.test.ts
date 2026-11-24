@@ -10,11 +10,11 @@ if (!process.env.TEST_DATABASE_URL) {
 }
 
 const database = createDatabase(readDatabaseUrl({ DATABASE_URL: process.env.TEST_DATABASE_URL }));
-const { Usuario, Rol, UsuarioRol, Paciente } = defineModels(database);
+const { Usuario, Rol, UsuarioRol, Paciente, Zona, Especialidad } = defineModels(database);
 
 before(async () => {
   const results = await Promise.all([runMigrations(database), runMigrations(database)]);
-  for (const name of ['001_create_usuarios', '002_create_roles', '003_create_pacientes']) {
+  for (const name of ['001_create_usuarios', '002_create_roles', '003_create_pacientes', '004_create_catalogos']) {
     assert.ok(results.flat().filter((applied) => applied === name).length <= 1);
   }
 });
@@ -33,6 +33,8 @@ test('los modelos coinciden con las columnas y claves de sus tablas', async () =
     ['roles', Object.entries(Rol.getAttributes())],
     ['usuario_roles', Object.entries(UsuarioRol.getAttributes())],
     ['pacientes', Object.entries(Paciente.getAttributes())],
+    ['zonas', Object.entries(Zona.getAttributes())],
+    ['especialidades', Object.entries(Especialidad.getAttributes())],
   ] as const;
   for (const [table, attributes] of models) {
     const columns = await database.getQueryInterface().describeTable(table);

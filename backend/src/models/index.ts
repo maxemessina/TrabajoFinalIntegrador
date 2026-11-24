@@ -1,14 +1,18 @@
 import type { Sequelize } from 'sequelize';
+import { defineEspecialidad } from './Especialidad.ts';
 import { definePaciente } from './Paciente.ts';
 import { defineRol } from './Rol.ts';
 import { defineUsuario } from './Usuario.ts';
 import { defineUsuarioRol } from './UsuarioRol.ts';
+import { defineZona } from './Zona.ts';
 
 export function defineModels(database: Sequelize) {
   const Usuario = defineUsuario(database);
   const Rol = defineRol(database);
   const UsuarioRol = defineUsuarioRol(database);
   const Paciente = definePaciente(database);
+  const Zona = defineZona(database);
+  const Especialidad = defineEspecialidad(database);
 
   Usuario.belongsToMany(Rol, {
     as: 'roles',
@@ -40,5 +44,5 @@ export function defineModels(database: Sequelize) {
     onUpdate: 'RESTRICT',
   });
 
-  return { Usuario, Rol, UsuarioRol, Paciente };
+  return { Usuario, Rol, UsuarioRol, Paciente, Zona, Especialidad };
 }

@@ -1,6 +1,7 @@
 import { loadEnv } from '../config.ts';
 import { createDatabase, readDatabaseUrl } from './connection.ts';
 import { MigrationStateError, runMigrations } from './migrator.ts';
+import { MissingIcuCollationError } from './migrations/004_create_catalogos.ts';
 
 loadEnv();
 const database = createDatabase(readDatabaseUrl());
@@ -13,7 +14,7 @@ try {
     console.log(`Migraciones aplicadas: ${executed.join(', ')}`);
   }
 } catch (error: unknown) {
-  if (error instanceof MigrationStateError) {
+  if (error instanceof MigrationStateError || error instanceof MissingIcuCollationError) {
     console.error(error.message);
   } else {
     const name = error instanceof Error && /^Sequelize[A-Za-z]+Error$/.test(error.name)

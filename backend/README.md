@@ -1,6 +1,6 @@
 # Backend
 
-Base de la API con Node.js, TypeScript y Express. Incluye la conexión PostgreSQL con Sequelize, el ejecutor de migraciones y los modelos iniciales de usuarios, roles y pacientes; todavía no hay datos demo ni endpoints de dominio.
+Base de la API con Node.js, TypeScript y Express. Incluye la conexión PostgreSQL con Sequelize, el ejecutor de migraciones y los modelos iniciales de usuarios, roles, pacientes y catálogos; todavía no hay datos demo ni endpoints de dominio.
 
 ## Arquitectura inicial
 
@@ -58,7 +58,7 @@ CORS controla qué respuestas puede leer un navegador desde otro origen; no sust
 
 ## Conexión a PostgreSQL
 
-Instalar PostgreSQL 13 o superior y crear una base local vacía con un usuario autorizado para crear tablas e índices. En el `.env` de la raíz, completar `DATABASE_URL` con una URL `postgres://` o `postgresql://` que incluya host y nombre de base. Ejemplo de formato, con marcadores que deben reemplazarse localmente:
+Instalar PostgreSQL 13 o superior con soporte ICU y crear una base local vacía con un usuario autorizado para crear tablas e índices. La migración de catálogos requiere la intercalación `und-x-icu`, disponible en instalaciones PostgreSQL con ICU. En el `.env` de la raíz, completar `DATABASE_URL` con una URL `postgres://` o `postgresql://` que incluya host y nombre de base. Ejemplo de formato, con marcadores que deben reemplazarse localmente:
 
 ```text
 DATABASE_URL=postgres://USUARIO:CONTRASENA@localhost:5432/portal_salud
@@ -83,6 +83,8 @@ La primera migración crea `usuarios`, con UUID, timestamps, estado validado y e
 La segunda migración crea `roles` y `usuario_roles` y carga los códigos fijos `paciente`, `profesional` y `administrador`. Un usuario puede tener varios roles, sin asignaciones duplicadas; las referencias restringen el borrado físico de usuarios y roles asignados. Estos códigos son datos del sistema, no usuarios de demostración.
 
 La tercera migración crea `pacientes`: cada perfil pertenece a un usuario distinto y su fecha de nacimiento opcional no puede ser futura según la fecha de la base de datos. No permite borrar físicamente un usuario con perfil de paciente. Crear el perfil no asigna el rol ni habilita acceso; la futura lógica de registro deberá crear usuario, rol y perfil en una transacción.
+
+La cuarta migración crea los catálogos `zonas` y `especialidades`, sin cargarlos todavía. Una zona es única por provincia y nombre y una especialidad por nombre, sin distinguir mayúsculas y minúsculas, incluso con acentos, mediante ICU. Ambas están activas por defecto y pueden desactivarse. Las consultas futuras que busquen estas claves sin distinguir mayúsculas deben usar la misma expresión `lower(campo COLLATE pg_catalog."und-x-icu")`.
 
 Agregar futuras migraciones a `src/database/migrations/` y registrarlas al final de la lista en `src/database/migrator.ts`, con nombres crecientes y únicos. No modificar ni renombrar migraciones ya aplicadas: agregar otra. No usar `sequelize.sync()` para crear el esquema de la aplicación. `defineModels` inicializa los modelos y sus asociaciones para una conexión Sequelize. La API aún no usa estos modelos; las respuestas futuras nunca deben exponer `password_hash`.
 
