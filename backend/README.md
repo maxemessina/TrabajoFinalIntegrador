@@ -1,6 +1,6 @@
 # Backend
 
-Base de la API con Node.js, TypeScript y Express. Incluye la conexión PostgreSQL con Sequelize, el ejecutor de migraciones y los modelos iniciales de usuarios, roles, pacientes, catálogos y profesionales; todavía no hay datos demo ni endpoints de dominio.
+Base de la API con Node.js, TypeScript y Express. Incluye la conexión PostgreSQL con Sequelize, migraciones, modelos y un seed demo opcional; todavía no hay endpoints de dominio.
 
 ## Arquitectura inicial
 
@@ -21,7 +21,7 @@ backend/
       migrate.ts           Comando para aplicar migraciones
       migrator.ts          Registro y ejecución de migraciones
       migrations/          Migraciones PostgreSQL
-      seeders/             Futuros datos iniciales o de demostración
+      seeders/             Datos de demostración opcionales
   tests/
     unit/                  Pruebas unitarias
     integration/           Pruebas HTTP y de integración
@@ -106,6 +106,18 @@ Agregar futuras migraciones a `src/database/migrations/` y registrarlas al final
 
 Para producción, configurar una conexión cifrada y certificados verificados de acuerdo con el proveedor PostgreSQL antes de desplegar; no desactivar la verificación de certificados. La configuración de despliegue se completará en PGSI-20.
 
+## Datos de demostración
+
+Solo en una base local o de pruebas sin datos reales, con `NODE_ENV=development` o `NODE_ENV=test`, ejecutar primero `npm run db:migrate` y luego:
+
+```sh
+npm run db:seed:demo
+```
+
+La carga es transaccional y registra `demo_v1` en `schema_seeds`. Repetirla, incluso simultáneamente, no duplica ni modifica datos; si después se modifican o borran registros demo, repetirla no los restaura. Un conflicto con datos existentes revierte toda la carga y se informa. Verificar siempre `DATABASE_URL`: `NODE_ENV` por sí solo no garantiza que la base sea local. No usar este comando en producción.
+
+Incluye usuarios y roles, catálogos, perfiles, un trabajo, un horario, un bloqueo, un turno atendido, una ficha y una nota con texto ficticio. Las cuentas están inactivas y tienen un marcador que no es una contraseña ni un hash válido: **no permiten iniciar sesión**. El profesional y su trabajo no están publicados. No crea tokens, visitas ni notificaciones pendientes, y no envía mensajes. El seed no cambia el comportamiento de la API ni habilita escrituras persistentes en el prototipo.
+
 ## Comprobaciones
 
 Desde `backend/`:
@@ -117,7 +129,7 @@ npm run typecheck
 npm test
 ```
 
-Para las pruebas de PostgreSQL, crear **otra base exclusiva para pruebas** y definir `TEST_DATABASE_URL` en el entorno con su URL. No usar una base de desarrollo o producción: el comando aplica las migraciones a esa base y conserva el esquema y el historial; los registros de prueba se revierten.
+Para las pruebas de PostgreSQL, crear **otra base exclusiva para pruebas** y definir `TEST_DATABASE_URL` en el entorno con su URL. No usar una base de desarrollo o producción: el comando aplica las migraciones a esa base y conserva el esquema y el historial; los registros de prueba se revierten. El usuario de la base debe poder crear esquemas: las pruebas del seed usan un esquema temporal propio y lo eliminan al terminar.
 
 ```sh
 npm run test:db
