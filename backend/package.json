@@ -1,0 +1,40 @@
+{
+  "name": "portal-salud-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "API del Portal de Gestión para Profesionales de la Salud",
+  "engines": {
+    "node": "^22.18.0 || >=24"
+  },
+  "scripts": {
+    "start": "node dist/server.js",
+    "dev": "node --watch src/server.ts",
+    "build": "tsc",
+    "db:check": "node src/database/check.ts",
+    "db:migrate": "node src/database/migrate.ts",
+    "db:seed:demo": "node src/database/seed.ts",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "lint": "eslint .",
+    "test": "node --test \"tests/unit/*.test.ts\" \"tests/integration/*.test.ts\"",
+    "test:db": "node --test \"tests/database/*.test.ts\""
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "jose": "^6.2.18",
+    "pg": "^8.23.1",
+    "sequelize": "^6.37.8"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/node": "~22.18.13",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.74.0"
+  }
+}
