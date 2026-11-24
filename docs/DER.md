@@ -364,7 +364,7 @@ El trabajador de envío debe reclamar tareas de forma atómica y permitir reinte
 |---|---|---|
 | `id` | UUID | PK. |
 | `usuario_id` | UUID | FK opcional → `usuarios.id`; `NULL` para visita anónima. |
-| `profesional_id` | UUID | FK opcional → `profesionales.id`; presente solo si se visita un perfil. |
+| `profesional_id` | UUID | FK → `profesionales.id`; obligatorio para `visita_perfil` y `NULL` para `visita_inicio`. |
 | `tipo` | varchar(30) | Obligatorio: `visita_inicio` o `visita_perfil`. |
 | `ocurrido_en` | timestamptz | Obligatorio. |
 

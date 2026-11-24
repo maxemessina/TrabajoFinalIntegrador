@@ -7,6 +7,7 @@ import { createCatalogos } from './migrations/004_create_catalogos.ts';
 import { createProfesionales } from './migrations/005_create_profesionales.ts';
 import { createAgenda } from './migrations/006_create_agenda.ts';
 import { createTokensRecuperacion } from './migrations/007_create_tokens_recuperacion.ts';
+import { createEventosVisita } from './migrations/008_create_eventos_visita.ts';
 
 type Migration = {
   name: string;
@@ -21,6 +22,7 @@ const migrations: readonly Migration[] = [
   { name: '005_create_profesionales', up: createProfesionales },
   { name: '006_create_agenda', up: createAgenda },
   { name: '007_create_tokens_recuperacion', up: createTokensRecuperacion },
+  { name: '008_create_eventos_visita', up: createEventosVisita },
 ];
 
 export class MigrationStateError extends Error {
