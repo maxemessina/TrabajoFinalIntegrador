@@ -76,3 +76,9 @@ jobs:
       - run: npm run db:check
         env:
           DATABASE_URL: postgres://pgsi_ci:pgsi_ci_only@127.0.0.1:5432/pgsi_ci
+      - run: npm run test:db
+        env:
+          TEST_DATABASE_URL: postgres://pgsi_ci:pgsi_ci_only@127.0.0.1:5432/pgsi_ci
+      - run: npm run db:migrate
+        env:
+          DATABASE_URL: postgres://pgsi_ci:pgsi_ci_only@127.0.0.1:5432/pgsi_ci

@@ -1,6 +1,6 @@
 # Backend
 
-Base de la API con Node.js, TypeScript y Express. La conexión PostgreSQL con Sequelize puede verificarse por separado; todavía no hay modelos, migraciones, datos demo ni módulos de dominio.
+Base de la API con Node.js, TypeScript y Express. Incluye la conexión PostgreSQL con Sequelize, el ejecutor de migraciones y el modelo inicial de usuarios; todavía no hay datos demo ni endpoints de dominio.
 
 ## Arquitectura inicial
 
@@ -10,7 +10,7 @@ backend/
     app.ts                 Aplicación y montaje de rutas y middlewares
     server.ts              Arranque HTTP
     config.ts              Variables de entorno
-    models/                Futuros modelos y asociaciones Sequelize
+    models/                Modelos y futuras asociaciones Sequelize
     routes/                Endpoints HTTP
     schemas/               Futura validación de solicitudes
     services/              Futura lógica de negocio
@@ -18,11 +18,14 @@ backend/
     database/
       connection.ts        Configuración de Sequelize para PostgreSQL
       check.ts             Comprobación explícita de conectividad
-      migrations/          Futuras migraciones de PostgreSQL
+      migrate.ts           Comando para aplicar migraciones
+      migrator.ts          Registro y ejecución de migraciones
+      migrations/          Migraciones PostgreSQL
       seeders/             Futuros datos iniciales o de demostración
   tests/
     unit/                  Pruebas unitarias
     integration/           Pruebas HTTP y de integración
+    database/              Pruebas con PostgreSQL aislado
 ```
 
 Las rutas reciben las solicitudes, utilizarán los esquemas para validarlas y delegarán la lógica a los servicios. Los archivos de rutas utilizan el sufijo `.routes.ts`; modelos y servicios, `.ts`; esquemas, `.schema.ts`. Si una ruta necesita un controlador separado, podrá agregarse sin obligar a usarlo en todas. Las carpetas vacías contienen `.gitkeep`, no código funcional.
@@ -55,7 +58,7 @@ CORS controla qué respuestas puede leer un navegador desde otro origen; no sust
 
 ## Conexión a PostgreSQL
 
-Instalar PostgreSQL y crear una base local vacía con un usuario autorizado. En el `.env` de la raíz, completar `DATABASE_URL` con una URL `postgres://` o `postgresql://` que incluya host y nombre de base. Ejemplo de formato, con marcadores que deben reemplazarse localmente:
+Instalar PostgreSQL 13 o superior y crear una base local vacía con un usuario autorizado para crear tablas e índices. En el `.env` de la raíz, completar `DATABASE_URL` con una URL `postgres://` o `postgresql://` que incluya host y nombre de base. Ejemplo de formato, con marcadores que deben reemplazarse localmente:
 
 ```text
 DATABASE_URL=postgres://USUARIO:CONTRASENA@localhost:5432/portal_salud
@@ -68,6 +71,16 @@ npm run db:check
 ```
 
 El comando verifica la conexión con Sequelize y cierra el pool; devuelve un error y código de salida distinto de cero si falla. No crea tablas, migra ni carga datos. La API y `health` todavía no se conectan automáticamente a PostgreSQL; esto conserva el arranque existente y no implementa aún el perfil mock ni la persistencia final.
+
+Para aplicar las migraciones a la base indicada por `DATABASE_URL`:
+
+```sh
+npm run db:migrate
+```
+
+La primera migración crea `usuarios`, con UUID, timestamps, estado validado y email único sin distinguir mayúsculas. No crea usuarios de demostración. Las migraciones registradas se aplican en orden en una transacción, con bloqueo para evitar ejecuciones simultáneas; su historial queda en `schema_migrations`. Repetir el comando no vuelve a ejecutarlas. Un fallo revierte la aplicación y se informa; si el historial no coincide con esta versión del proyecto, el comando se detiene.
+
+Agregar futuras migraciones a `src/database/migrations/` y registrarlas al final de la lista en `src/database/migrator.ts`, con nombres crecientes y únicos. No modificar ni renombrar migraciones ya aplicadas: agregar otra. No usar `sequelize.sync()` para crear el esquema de la aplicación. La API aún no usa el modelo; las respuestas futuras nunca deben exponer `password_hash`.
 
 Para producción, configurar una conexión cifrada y certificados verificados de acuerdo con el proveedor PostgreSQL antes de desplegar; no desactivar la verificación de certificados. La configuración de despliegue se completará en PGSI-20.
 
@@ -82,7 +95,13 @@ npm run typecheck
 npm test
 ```
 
-La CI ejecuta estas comprobaciones con Node.js 22.18 y 24 y verifica la conexión contra un PostgreSQL temporal. `typecheck` también verifica los tipos de las pruebas; `build` genera la aplicación en `dist/`.
+Para las pruebas de PostgreSQL, crear **otra base exclusiva para pruebas** y definir `TEST_DATABASE_URL` en el entorno con su URL. No usar una base de desarrollo o producción: el comando aplica las migraciones a esa base y conserva el esquema y el historial; los registros de prueba se revierten.
+
+```sh
+npm run test:db
+```
+
+El comando exige `TEST_DATABASE_URL` explícita y no usa `DATABASE_URL` como alternativa. La CI ejecuta estas comprobaciones con Node.js 22.18 y 24 contra un PostgreSQL temporal. `typecheck` también verifica los tipos de las pruebas; `build` genera la aplicación en `dist/`.
 
 ## Respuestas iniciales
 

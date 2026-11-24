@@ -12,7 +12,7 @@ Portal para buscar profesionales por zona y especialidad, gestionar turnos y aco
 - `postman/`: futura colección de pruebas de la API.
 - [DER.md](DER.md): propuesta de modelo de datos para PostgreSQL.
 
-El backend cuenta con un servidor inicial, una ruta de salud y una comprobación independiente de conexión PostgreSQL con Sequelize; aún no implementa módulos de dominio ni persistencia. El frontend todavía no está implementado. Para el prototipo se usarán respuestas simuladas sin escrituras persistentes; la aplicación final utilizará PostgreSQL y Sequelize.
+El backend cuenta con un servidor inicial, una ruta de salud y la base de persistencia PostgreSQL con Sequelize: conexión, migraciones y modelo inicial de usuarios. Aún no implementa endpoints de dominio ni datos demo. El frontend todavía no está implementado. Para el prototipo se usarán respuestas simuladas sin escrituras persistentes; la aplicación final utilizará PostgreSQL y Sequelize.
 
 El repositorio es público: utilizar únicamente datos ficticios y no versionar datos de pacientes ni credenciales.
 
@@ -43,4 +43,4 @@ El repositorio es público: utilizar únicamente datos ficticios y no versionar 
 
 ## Integración continua
 
-GitHub Actions comprueba la estructura inicial, que los archivos `.env` estén ignorados y no versionados, y los errores de espacios del último commit en pushes y PR hacia `dev` o `main`. También instala las dependencias del backend y ejecuta lint, compilación, verificación de tipos, pruebas y una comprobación de conexión a PostgreSQL temporal.
+GitHub Actions comprueba la estructura inicial, que los archivos `.env` estén ignorados y no versionados, y los errores de espacios del último commit en pushes y PR hacia `dev` o `main`. También instala las dependencias del backend y ejecuta lint, compilación, verificación de tipos, pruebas y migraciones contra PostgreSQL temporal.
