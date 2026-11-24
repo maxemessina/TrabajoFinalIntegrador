@@ -2,6 +2,7 @@ import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import express from 'express';
+import { ConnectionError } from 'sequelize';
 import { createApp } from '../../src/app.ts';
 import { errorHandler } from '../../src/middleware/errors.ts';
 
@@ -31,6 +32,20 @@ test('health responde correctamente', async () => {
   const response = await fetch(`${baseUrl}/api/v1/health`);
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { data: { status: 'ok' } });
+});
+
+test('sin base configurada auth devuelve 503 y health sigue disponible', async () => {
+  const health = await fetch(`${baseUrl}/api/v1/health`);
+  assert.equal(health.status, 200);
+  const response = await fetch(`${baseUrl}/api/v1/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'ana@example.invalid', password: 'password' }),
+  });
+  assert.equal(response.status, 503);
+  assert.deepEqual(await response.json(), {
+    error: { code: 'SERVICE_UNAVAILABLE', message: 'La autenticación no está disponible temporalmente' },
+  });
 });
 
 test('CORS permite el origen configurado incluso en preflight', async () => {
@@ -116,6 +131,33 @@ test('errores inesperados se registran sin revelar detalles al cliente', async (
       error: { code: 'INTERNAL_ERROR', message: 'Error interno del servidor' },
     });
     assert.equal(log.mock.callCount(), 1);
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      errorServer.close((error) => error ? reject(error) : resolve()));
+  }
+});
+
+test('errores de conexión con PostgreSQL devuelven 503 sin exponer detalles', async (context) => {
+  const log = context.mock.method(console, 'error', () => {});
+  const app = express();
+  app.get('/', () => { throw new ConnectionError(new Error('postgres://secret@host/db')); });
+  app.use(errorHandler);
+  const errorServer = await new Promise<Server>((resolve, reject) => {
+    const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
+    listener.on('error', reject);
+  });
+  try {
+    const address = errorServer.address();
+    if (!address || typeof address === 'string') {
+      throw new Error('El servidor de prueba no tiene un puerto TCP');
+    }
+    const response = await fetch(`http://127.0.0.1:${address.port}/`);
+    assert.equal(response.status, 503);
+    assert.deepEqual(await response.json(), {
+      error: { code: 'SERVICE_UNAVAILABLE', message: 'El servicio no está disponible temporalmente' },
+    });
+    assert.equal(log.mock.callCount(), 1);
+    assert.doesNotMatch(JSON.stringify(log.mock.calls[0]?.arguments), /secret@host/);
   } finally {
     await new Promise<void>((resolve, reject) =>
       errorServer.close((error) => error ? reject(error) : resolve()));

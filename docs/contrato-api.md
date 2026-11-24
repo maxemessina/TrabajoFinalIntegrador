@@ -73,7 +73,7 @@ Ejemplo de ruta inexistente, compatible con la base actual:
 
 Los códigos del DER y de la API son `paciente`, `profesional`, `administrador`. En los tickets `PATIENT`, `PROFESSIONAL`, `ADMIN` se refieren respectivamente a esos mismos códigos, no a valores adicionales. Un usuario puede tener varios roles y como máximo un perfil de cada tipo. Un perfil por sí solo no concede permisos: el rol debe estar vigente y el usuario activo.
 
-Se envía `Authorization: Bearer <access_token>`. El servidor valida firma, vencimiento, estado del usuario y roles vigentes; no confía en un rol o ID declarados por el cliente. Ninguna operación pública permite asignarse `administrador` o `profesional`. CORS no reemplaza estas comprobaciones.
+Se envía `Authorization: Bearer <access_token>`. El servidor valida firma, vencimiento y estado del usuario, y consulta los roles vigentes en PostgreSQL en cada solicitud autenticada; el JWT no es fuente de verdad para roles. No confía en un rol o ID declarados por el cliente. Ninguna operación pública permite asignarse `administrador` o `profesional`. CORS no reemplaza estas comprobaciones.
 
 | Operación | Anónimo | Paciente | Profesional | Administrador |
 |---|---|---|---|---|
@@ -149,7 +149,7 @@ Los campos públicos derivados `nombre` y `apellido` provienen de `usuarios`; se
 
 Se normaliza el email quitando espacios de extremos y usando minúsculas; máximo 254 caracteres y único sin distinguir mayúsculas. Nombre y apellido: cadenas no vacías, máximo 100; teléfono nullable de hasta 30 caracteres. Contraseña: cadena de 10 a 128 caracteres, sin recorte ni normalización silenciosa. La fecha de nacimiento no puede ser futura. Un email ya registrado en el alta devuelve `409 CONFLICT`; la recuperación siempre responde igual para evitar enumeración. El JWT de acceso dura 3600 segundos; `expires_in` indica su duración en segundos.
 
-El token de recuperación es aleatorio, de un solo uso, expira a los 30 minutos y se guarda únicamente como hash; su consumo y cambio de contraseña son atómicos. Si la cuenta existe y está activa, se solicita el correo por un servicio real o mock. No incluir el token en logs ni respuestas. El cierre de sesión de v1 consiste en eliminar el token del cliente; **no revoca** un JWT ya emitido. El vencimiento y una futura revocación del lado del servidor deben definirse en PGSI-5; no afirmar que cerrar sesión invalida tokens robados.
+El token de recuperación es aleatorio, de un solo uso, expira a los 30 minutos y se guarda únicamente como hash; su consumo y cambio de contraseña son atómicos. Si la cuenta existe y está activa, se solicita el correo por un servicio real o mock. No incluir el token en logs ni respuestas. El JWT de acceso expira en 3600 segundos. El cierre de sesión de v1 consiste en eliminar el token del cliente; **no revoca** un JWT ya emitido.
 
 Ejemplo de registro (`POST /api/v1/auth/registro`):
 

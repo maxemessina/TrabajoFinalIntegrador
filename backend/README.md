@@ -1,6 +1,6 @@
 # Backend
 
-Base de la API con Node.js, TypeScript y Express. Incluye la conexión PostgreSQL con Sequelize, migraciones, modelos y un seed demo opcional; todavía no hay endpoints de dominio.
+Base de la API con Node.js, TypeScript, Express y Sequelize. Incluye persistencia PostgreSQL, endpoints de autenticación y perfil propio, y un seed demo opcional; los CRUD de dominio corresponden a sus tickets.
 
 ## Arquitectura inicial
 
@@ -12,8 +12,8 @@ backend/
     config.ts              Variables de entorno
     models/                Modelos y asociaciones Sequelize
     routes/                Endpoints HTTP
-    schemas/               Futura validación de solicitudes
-    services/              Futura lógica de negocio
+    schemas/               Validación estricta de solicitudes
+    services/              Lógica de autenticación y servicios compartidos
     middleware/            Middlewares compartidos
     database/
       connection.ts        Configuración de Sequelize para PostgreSQL
@@ -28,7 +28,7 @@ backend/
     database/              Pruebas con PostgreSQL aislado
 ```
 
-Las rutas reciben las solicitudes, utilizarán los esquemas para validarlas y delegarán la lógica a los servicios. Los archivos de rutas utilizan el sufijo `.routes.ts`; modelos y servicios, `.ts`; esquemas, `.schema.ts`. Si una ruta necesita un controlador separado, podrá agregarse sin obligar a usarlo en todas. Las carpetas vacías contienen `.gitkeep`, no código funcional.
+Las rutas validan las solicitudes mediante esquemas y delegan la lógica a los servicios. Los archivos de rutas utilizan el sufijo `.routes.ts`; modelos y servicios, `.ts`; esquemas, `.schema.ts`. Si una ruta necesita un controlador separado, podrá agregarse sin obligar a usarlo en todas. Las carpetas vacías contienen `.gitkeep`, no código funcional.
 
 Las migraciones serán la fuente de verdad del esquema; los modelos deberán reflejarlas, según el [DER](../docs/DER.md). No se incluyen aún funcionalidades específicas para preservar la distribución de tareas del equipo.
 
@@ -45,6 +45,8 @@ npm run dev
 
 `npm run dev` ejecuta TypeScript con recarga automática. Para ejecutar la versión compilada, usar `npm run build` y luego `npm start`. Consultar `http://localhost:3000/api/v1/health` para verificar que responde. Para detenerlo, usar Ctrl+C.
 
+Sin `DATABASE_URL`, el servidor solo ofrece health; las rutas de autenticación responden `503 SERVICE_UNAVAILABLE`. Para habilitar autenticación, completar `DATABASE_URL` y `JWT_SECRET`, ejecutar `npm run db:migrate` desde `backend/` y luego iniciar la API. El servidor comprueba la conexión al arrancar.
+
 La configuración se lee del `.env` en la raíz, independientemente del directorio desde donde se inicie el proceso. Las variables del entorno tienen prioridad sobre el archivo. No compartir `.env` ni incluir datos reales.
 
 | Variable | Descripción |
@@ -52,9 +54,18 @@ La configuración se lee del `.env` en la raíz, independientemente del director
 | `NODE_ENV` | `development`, `test` o `production`; por defecto `development`. |
 | `PORT` | Puerto TCP entre 1 y 65535; por defecto `3000`. |
 | `CORS_ORIGIN` | Un único origen permitido, sin ruta ni barra final. En desarrollo por defecto es `http://localhost:5173`; en producción es obligatorio configurarlo explícitamente. |
-| `DATABASE_URL` | URL de PostgreSQL para los comandos de base de datos. No es necesaria para arrancar la API actual; se exige al verificar la conexión. |
+| `DATABASE_URL` | URL PostgreSQL para migraciones, seeds y autenticación. Si falta, la API inicia en modo health-only. |
+| `JWT_SECRET` | Secreto aleatorio de al menos 32 bytes para firmar JWT. Se exige al arrancar con `DATABASE_URL`; health-only no lo necesita. |
 
 CORS controla qué respuestas puede leer un navegador desde otro origen; no sustituye autenticación ni autorización.
+
+Generar un secreto local para autenticación desde PowerShell:
+
+```powershell
+node -e "console.log(require('node:crypto').randomBytes(32).toString('base64url'))"
+```
+
+Guardar el resultado solo en `.env` como `JWT_SECRET`; no usar el valor vacío de `sample.env`, una contraseña humana ni el mismo secreto en distintos entornos.
 
 ## Conexión a PostgreSQL
 
@@ -70,7 +81,7 @@ Codificar los caracteres especiales del usuario o contraseña como componentes d
 npm run db:check
 ```
 
-El comando verifica la conexión con Sequelize y cierra el pool; devuelve un error y código de salida distinto de cero si falla. No crea tablas, migra ni carga datos. La API y `health` todavía no se conectan automáticamente a PostgreSQL; esto conserva el arranque existente y no implementa aún el perfil mock ni la persistencia final.
+El comando verifica la conexión con Sequelize y cierra el pool; devuelve un error y código de salida distinto de cero si falla. No crea tablas, migra ni carga datos. Health continúa disponible sin PostgreSQL; con `DATABASE_URL`, la API verifica la conexión antes de ofrecer autenticación.
 
 Para aplicar las migraciones a la base indicada por `DATABASE_URL`:
 
@@ -103,6 +114,16 @@ La undécima migración crea `fichas_clinicas`, con una ficha por paciente y pro
 La duodécima migración crea `notas_clinicas`. Sus columnas técnicas `paciente_id` y `profesional_id` permiten que claves foráneas compuestas garanticen que la ficha y el turno opcional pertenecen a la misma pareja, y restringen borrar o cambiar sus titulares mientras estén referenciados. El servicio deberá obtener esos IDs de la ficha, no del cliente. Esto no implementa acceso clínico: PGSI-10 deberá validar la relación de atención, autorizar exclusivamente al profesional dueño, exigir contenido no vacío y comprobar que el turno asociado esté atendido. Coordinar con Valentina la integración; no habilitar edición ni eliminación clínica sin auditoría y política de retención.
 
 Agregar futuras migraciones a `src/database/migrations/` y registrarlas al final de la lista en `src/database/migrator.ts`, con nombres crecientes y únicos. No modificar ni renombrar migraciones ya aplicadas: agregar otra. No usar `sequelize.sync()` para crear el esquema de la aplicación. `defineModels` inicializa los modelos y sus asociaciones para una conexión Sequelize. La API aún no usa estos modelos; las respuestas futuras nunca deben exponer `password_hash`.
+
+## Autenticación
+
+PGSI-5 implementa `POST /api/v1/auth/registro`, `POST /api/v1/auth/login`, `POST /api/v1/auth/recuperacion`, `POST /api/v1/auth/restablecimiento`, `GET /api/v1/me` y `PATCH /api/v1/me`, según el contrato. El registro público crea solo el rol paciente y el perfil correspondiente dentro de una transacción; no puede autoasignarse roles profesionales o administrador. Los cuerpos rechazan campos desconocidos.
+
+Las contraseñas se guardan mediante `scrypt` con sal aleatoria; nunca se devuelven. Los JWT HS256 duran una hora, requieren `JWT_SECRET` y contienen solo el ID del usuario; cada solicitud autenticada vuelve a comprobar usuario activo y roles vigentes en PostgreSQL. Usar `Authorization: Bearer <access_token>`. Los endpoints futuros deben aplicar `requireAuth` y `requireRoles(...)`; el perfil de paciente o profesional por sí solo no concede permisos.
+
+La recuperación guarda únicamente SHA-256 del token aleatorio, invalida tokens previos y consume el token y actualiza la contraseña en una transacción; vence en 30 minutos. En desarrollo se usa un correo mock que no entrega correo ni imprime email o token. En pruebas, el adaptador se inyecta para verificar el flujo. En producción no conectar un proveedor real hasta configurar PGSI-12. La recuperación no distingue cuentas existentes en su respuesta. El cierre de sesión de v1 es del lado del cliente: descartar el access token; no revoca uno ya emitido.
+
+Si `DATABASE_URL` no está configurada, las rutas de auth devuelven `503` explícito, sin simular registro o login. Con DB configurada se requiere migrar el esquema y establecer `JWT_SECRET` antes de iniciar la API.
 
 Para producción, configurar una conexión cifrada y certificados verificados de acuerdo con el proveedor PostgreSQL antes de desplegar; no desactivar la verificación de certificados. La configuración de despliegue se completará en PGSI-20.
 
