@@ -6,13 +6,13 @@ Portal para buscar profesionales por zona y especialidad, gestionar turnos y aco
 
 ## Estructura
 
-- `backend/`: futura API con Node.js, Express y Sequelize.
+- `backend/`: base de la API con Node.js, TypeScript y Express; ver [instrucciones de instalación y ejecución](backend/README.md).
 - `frontend/`: futura aplicación con React y TypeScript.
 - `docs/`: documentación compartida y futuro contrato de la API.
 - `postman/`: futura colección de pruebas de la API.
 - [DER.md](DER.md): propuesta de modelo de datos para PostgreSQL.
 
-Las carpetas están reservadas: todavía no hay aplicaciones, dependencias ni comandos de instalación o ejecución para el backend o el frontend. Se documentarán junto con su implementación. Para el prototipo se usarán respuestas simuladas sin escrituras persistentes; la aplicación final utilizará PostgreSQL.
+El backend cuenta con un servidor inicial y una ruta de salud; aún no implementa módulos de dominio ni persistencia. El frontend todavía no está implementado. Para el prototipo se usarán respuestas simuladas sin escrituras persistentes; la aplicación final utilizará PostgreSQL y Sequelize.
 
 El repositorio es público: utilizar únicamente datos ficticios y no versionar datos de pacientes ni credenciales.
 
@@ -26,13 +26,13 @@ El repositorio es público: utilizar únicamente datos ficticios y no versionar 
    cd TrabajoFinalIntegrador
    ```
 
-3. Cuando los componentes definan sus variables, copiar `sample.env` a `.env` y completar los valores locales. En PowerShell:
+3. Copiar `sample.env` a `.env` y ajustar la configuración local si es necesario. En PowerShell:
 
    ```powershell
    Copy-Item sample.env .env
    ```
 
-   El ejemplo aún no define variables porque la configuración no está implementada. No subir `.env` ni credenciales al repositorio.
+   No subir `.env` ni credenciales al repositorio. Seguir las [instrucciones del backend](backend/README.md) para instalarlo, iniciarlo y ejecutar sus comprobaciones. El frontend aún no tiene comandos de instalación ni ejecución.
 
 ## Ramas y contribuciones
 
@@ -43,4 +43,4 @@ El repositorio es público: utilizar únicamente datos ficticios y no versionar 
 
 ## Integración continua
 
-GitHub Actions comprueba la estructura inicial, que los archivos `.env` estén ignorados y no versionados, y los errores de espacios del último commit en pushes y PR hacia `dev` o `main`. La instalación, lint y pruebas de cada componente se incorporarán cuando existan.
+GitHub Actions comprueba la estructura inicial, que los archivos `.env` estén ignorados y no versionados, y los errores de espacios del último commit en pushes y PR hacia `dev` o `main`. También instala las dependencias del backend y ejecuta lint, compilación, verificación de tipos y pruebas.
