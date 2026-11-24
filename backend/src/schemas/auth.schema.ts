@@ -92,7 +92,7 @@ function validDate(value: string): boolean {
   return date.toISOString().slice(0, 10) === value;
 }
 
-function birthDateField(body: JsonObject): string | null | undefined {
+export function birthDateField(body: JsonObject): string | null | undefined {
   const value = body.fecha_nacimiento;
   if (value === undefined || value === null) {
     return value;

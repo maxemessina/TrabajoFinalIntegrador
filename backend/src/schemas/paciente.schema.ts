@@ -1,6 +1,8 @@
 import { HttpError } from '../http-error.ts';
+import { birthDateField } from './auth.schema.ts';
 
 const sortFields = ['id', 'nombre', 'apellido', 'fecha_nacimiento', 'creado_en'] as const;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export type PacienteSortField = typeof sortFields[number];
 
 export type PacienteListQuery = {
@@ -92,8 +94,33 @@ export function parsePacienteListQuery(value: unknown): PacienteListQuery {
 }
 
 export function parsePacienteId(value: string): string {
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+  if (!uuidPattern.test(value)) {
     return invalid('id', 'Debe ser un UUID válido');
   }
   return value;
+}
+
+export function parsePacienteCreate(value: unknown): { usuario_id: string; fecha_nacimiento?: string | null } {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Los datos enviados no son válidos');
+  }
+  const body = value as Record<string, unknown>;
+  const unknown = Object.keys(body).filter((field) => !['usuario_id', 'fecha_nacimiento'].includes(field));
+  if (unknown.length > 0) {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Los datos enviados no son válidos', unknown.map((field) => ({
+      field,
+      message: 'Campo desconocido',
+    })));
+  }
+  const userId = body.usuario_id;
+  if (typeof userId !== 'string' || !uuidPattern.test(userId)) {
+    throw new HttpError(400, 'VALIDATION_ERROR', 'Los datos enviados no son válidos', [
+      { field: 'usuario_id', message: 'Debe ser un UUID válido' },
+    ]);
+  }
+  const birthDate = birthDateField(body);
+  return {
+    usuario_id: userId,
+    ...(birthDate !== undefined ? { fecha_nacimiento: birthDate } : {}),
+  };
 }

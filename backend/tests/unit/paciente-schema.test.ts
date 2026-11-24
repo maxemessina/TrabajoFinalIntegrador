@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HttpError } from '../../src/http-error.ts';
-import { parsePacienteId, parsePacienteListQuery } from '../../src/schemas/paciente.schema.ts';
+import { parsePacienteCreate, parsePacienteId, parsePacienteListQuery } from '../../src/schemas/paciente.schema.ts';
 
 test('la lista de pacientes aplica valores predeterminados y normaliza filtros', () => {
   assert.deepEqual(parsePacienteListQuery({}), {
@@ -45,4 +45,26 @@ test('el identificador de paciente debe tener formato UUID', () => {
   assert.equal(parsePacienteId(id), id);
   assert.throws(() => parsePacienteId('no-es-un-uuid'), (error: unknown) =>
     error instanceof HttpError && error.status === 400);
+});
+
+test('el alta distingue fecha omitida, fecha válida y null', () => {
+  const usuario_id = '11111111-1111-4111-8111-111111111111';
+  assert.deepEqual(parsePacienteCreate({ usuario_id }), { usuario_id });
+  assert.deepEqual(parsePacienteCreate({ usuario_id, fecha_nacimiento: null }), { usuario_id, fecha_nacimiento: null });
+  assert.deepEqual(parsePacienteCreate({ usuario_id, fecha_nacimiento: '2000-02-29' }), {
+    usuario_id,
+    fecha_nacimiento: '2000-02-29',
+  });
+});
+
+test('el alta rechaza identificador, fecha y campos inválidos', () => {
+  const usuario_id = '11111111-1111-4111-8111-111111111111';
+  for (const body of [
+    null, [], {}, { usuario_id: 'invalido' }, { usuario_id, rol: 'administrador' },
+    { usuario_id, fecha_nacimiento: '2001-02-29' }, { usuario_id, fecha_nacimiento: '9999-01-01' },
+    { usuario_id, fecha_nacimiento: 5 },
+  ]) {
+    assert.throws(() => parsePacienteCreate(body), (error: unknown) =>
+      error instanceof HttpError && error.status === 400);
+  }
 });

@@ -147,6 +147,27 @@ async function get(path: string, token?: string): Promise<Response> {
   });
 }
 
+async function postPatient(body: unknown, token?: string): Promise<Response> {
+  return fetch(`${baseUrl}/pacientes`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+async function createUserForWrite(active = true) {
+  return Usuario.create({
+    nombre: 'Alta',
+    apellido: 'Prueba',
+    email: `alta-${randomUUID()}@example.invalid`,
+    password_hash: 'hash-ficticio',
+    estado: active ? 'activo' : 'inactivo',
+  });
+}
+
 async function readJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
@@ -221,4 +242,107 @@ test('profesionales solo consultan pacientes con turno no cancelado compartido',
 test('la autenticación y los roles distinguen 401 de 403', async () => {
   assert.equal((await get('/pacientes')).status, 401);
   assert.equal((await get('/pacientes', noRoleToken)).status, 403);
+});
+
+test('el administrador crea el perfil y asigna el rol en una transacción', async () => {
+  const user = await createUserForWrite();
+  const response = await postPatient({ usuario_id: user.id, fecha_nacimiento: '1992-05-04' }, adminToken);
+  assert.equal(response.status, 201);
+  const result = await readJson<{ data: Record<string, unknown> }>(response);
+  assert.equal(response.headers.get('location'), `/api/v1/pacientes/${result.data.id}`);
+  assert.equal(result.data.usuario_id, user.id);
+  assert.equal(result.data.nombre, user.nombre);
+  assert.equal(result.data.fecha_nacimiento, '1992-05-04');
+  assert.equal(result.data.activo, true);
+  assert.equal('email' in result.data, false);
+  assert.equal('password_hash' in result.data, false);
+  const role = await Rol.findOne({ where: { codigo: 'paciente' } });
+  assert.ok(role);
+  assert.equal(await Paciente.count({ where: { usuario_id: user.id } }), 1);
+  assert.equal(await UsuarioRol.count({ where: { usuario_id: user.id, rol_id: role.id } }), 1);
+  assert.equal((await postPatient({ usuario_id: user.id }, adminToken)).status, 409);
+});
+
+test('reactivar un perfil conserva la fecha omitida y admite fecha nueva o null', async () => {
+  const user = await createUserForWrite();
+  const patient = await Paciente.create({ usuario_id: user.id, fecha_nacimiento: '1990-01-01' });
+  const role = await Rol.findOne({ where: { codigo: 'paciente' } });
+  assert.ok(role);
+  const first = await postPatient({ usuario_id: user.id }, adminToken);
+  assert.equal(first.status, 200);
+  assert.equal(first.headers.get('location'), null);
+  assert.equal((await readJson<{ data: { id: string; fecha_nacimiento: string | null } }>(first)).data.fecha_nacimiento, '1990-01-01');
+  assert.equal(await UsuarioRol.count({ where: { usuario_id: user.id, rol_id: role.id } }), 1);
+
+  await UsuarioRol.destroy({ where: { usuario_id: user.id, rol_id: role.id } });
+  const changed = await postPatient({ usuario_id: user.id, fecha_nacimiento: '1980-03-01' }, adminToken);
+  assert.equal(changed.status, 200);
+  const changedData = await readJson<{ data: { id: string; fecha_nacimiento: string | null } }>(changed);
+  assert.equal(changedData.data.id, patient.id);
+  assert.equal(changedData.data.fecha_nacimiento, '1980-03-01');
+
+  await UsuarioRol.destroy({ where: { usuario_id: user.id, rol_id: role.id } });
+  const cleared = await postPatient({ usuario_id: user.id, fecha_nacimiento: null }, adminToken);
+  assert.equal(cleared.status, 200);
+  assert.equal((await readJson<{ data: { fecha_nacimiento: string | null } }>(cleared)).data.fecha_nacimiento, null);
+  assert.equal(await Paciente.count({ where: { usuario_id: user.id } }), 1);
+});
+
+test('el alta rechaza solicitudes sin permiso, inválidas, usuarios inexistentes o inactivos', async () => {
+  const user = await createUserForWrite();
+  const inactive = await createUserForWrite(false);
+  assert.equal((await postPatient({ usuario_id: user.id })).status, 401);
+  assert.equal((await postPatient({ usuario_id: user.id }, patientToken)).status, 403);
+  assert.equal((await postPatient({ usuario_id: user.id }, professionalToken)).status, 403);
+  assert.equal((await postPatient({ usuario_id: 'invalido' }, adminToken)).status, 400);
+  assert.equal((await postPatient({ usuario_id: user.id, fecha_nacimiento: '9999-01-01' }, adminToken)).status, 400);
+  assert.equal((await postPatient({ usuario_id: user.id, rol: 'administrador' }, adminToken)).status, 400);
+  assert.equal((await postPatient({ usuario_id: randomUUID() }, adminToken)).status, 404);
+  assert.equal((await postPatient({ usuario_id: inactive.id }, adminToken)).status, 409);
+  assert.equal(await Paciente.count({ where: { usuario_id: user.id } }), 0);
+  assert.equal(await Paciente.count({ where: { usuario_id: inactive.id } }), 0);
+});
+
+test('altas concurrentes del mismo usuario no duplican el perfil ni el rol', async () => {
+  const user = await createUserForWrite();
+  const responses = await Promise.all([
+    postPatient({ usuario_id: user.id }, adminToken),
+    postPatient({ usuario_id: user.id }, adminToken),
+  ]);
+  assert.deepEqual(responses.map((response) => response.status).sort(), [201, 409]);
+  const role = await Rol.findOne({ where: { codigo: 'paciente' } });
+  assert.ok(role);
+  assert.equal(await Paciente.count({ where: { usuario_id: user.id } }), 1);
+  assert.equal(await UsuarioRol.count({ where: { usuario_id: user.id, rol_id: role.id } }), 1);
+});
+
+test('un fallo al asignar el rol revierte la creación o modificación del perfil', async () => {
+  const user = await createUserForWrite();
+  await database.query(`
+    CREATE FUNCTION fail_patient_role_assignment() RETURNS trigger LANGUAGE plpgsql AS $$
+    BEGIN
+      IF NEW.usuario_id = '${user.id}'::uuid THEN
+        RAISE EXCEPTION 'fallo de prueba';
+      END IF;
+      RETURN NEW;
+    END $$`);
+  await database.query(`
+    CREATE TRIGGER fail_patient_role_assignment
+    BEFORE INSERT ON usuario_roles
+    FOR EACH ROW EXECUTE FUNCTION fail_patient_role_assignment()`);
+  try {
+    const response = await postPatient({ usuario_id: user.id }, adminToken);
+    assert.equal(response.status, 500);
+    assert.equal(await Paciente.count({ where: { usuario_id: user.id } }), 0);
+    assert.equal(await UsuarioRol.count({ where: { usuario_id: user.id } }), 0);
+    const patient = await Paciente.create({ usuario_id: user.id, fecha_nacimiento: '1990-01-01' });
+    const reactivation = await postPatient({ usuario_id: user.id, fecha_nacimiento: '1980-01-01' }, adminToken);
+    assert.equal(reactivation.status, 500);
+    await patient.reload();
+    assert.equal(patient.fecha_nacimiento, '1990-01-01');
+    assert.equal(await UsuarioRol.count({ where: { usuario_id: user.id } }), 0);
+  } finally {
+    await database.query('DROP TRIGGER fail_patient_role_assignment ON usuario_roles');
+    await database.query('DROP FUNCTION fail_patient_role_assignment()');
+  }
 });

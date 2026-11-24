@@ -4,7 +4,7 @@ import { HttpError } from '../http-error.ts';
 import { requireAuth, requireRoles } from '../middleware/auth.ts';
 import type { ApplicationModels, AuthService } from '../services/auth.service.ts';
 import { createPacienteService } from '../services/paciente.service.ts';
-import { parsePacienteId, parsePacienteListQuery } from '../schemas/paciente.schema.ts';
+import { parsePacienteCreate, parsePacienteId, parsePacienteListQuery } from '../schemas/paciente.schema.ts';
 
 export type PacienteRouteDependencies = {
   models: ApplicationModels;
@@ -19,6 +19,7 @@ export function createUnavailablePacientesRouter() {
   const router = Router();
   router.get('/pacientes', unavailable);
   router.get('/pacientes/:id', unavailable);
+  router.post('/pacientes', unavailable);
   return router;
 }
 
@@ -52,6 +53,14 @@ export function createPacientesRouter(dependencies: PacienteRouteDependencies) {
       throw new HttpError(404, 'NOT_FOUND', 'Paciente no encontrado');
     }
     response.status(200).json({ data: patient });
+  });
+
+  router.post('/pacientes', authenticate, requireRoles('administrador'), async (request, response) => {
+    const result = await pacientes.create(parsePacienteCreate(request.body));
+    if (result.created) {
+      response.location(`/api/v1/pacientes/${result.patient.id}`);
+    }
+    response.status(result.created ? 201 : 200).json({ data: result.patient });
   });
 
   return router;

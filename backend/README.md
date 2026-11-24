@@ -127,7 +127,9 @@ Si `DATABASE_URL` no está configurada, las rutas de auth devuelven `503` explí
 
 ## Pacientes (PGSI-6)
 
-La primera etapa implementa `GET /api/v1/pacientes` y `GET /api/v1/pacientes/:id`. Las listas validan búsqueda por nombre/apellido, filtro de actividad, orden y paginación; `total` cuenta todos los resultados visibles antes de paginar. Un paciente consulta solo su perfil, un profesional solo perfiles con turnos compartidos no cancelados y el administrador puede consultar todos. La respuesta no incluye email, teléfono, contraseña ni datos clínicos. Las operaciones de escritura y baja lógica quedan para la siguiente etapa de PGSI-6.
+Están implementados `GET /api/v1/pacientes`, `GET /api/v1/pacientes/:id` y `POST /api/v1/pacientes`. Las listas validan búsqueda por nombre/apellido, filtro de actividad, orden y paginación; `total` cuenta todos los resultados visibles antes de paginar. Un paciente consulta solo su perfil, un profesional solo perfiles con turnos compartidos no cancelados y el administrador puede consultar todos. La respuesta no incluye email, teléfono, contraseña ni datos clínicos.
+
+Solo un administrador puede dar de alta un perfil para un usuario activo existente: se crea el perfil y se asigna el rol paciente en una transacción. Si el perfil ya existe sin el rol, se reactiva la asignación y se conserva la fecha de nacimiento salvo que se envíe otra o `null`; si ya tiene el rol, se responde `409`. Las operaciones de edición y baja lógica quedan para la siguiente etapa de PGSI-6.
 
 Para producción, configurar una conexión cifrada y certificados verificados de acuerdo con el proveedor PostgreSQL antes de desplegar; no desactivar la verificación de certificados. La configuración de despliegue se completará en PGSI-20.
 

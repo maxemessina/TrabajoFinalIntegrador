@@ -51,6 +51,8 @@ test('sin base configurada auth devuelve 503 y health sigue disponible', async (
   assert.deepEqual(await patients.json(), {
     error: { code: 'SERVICE_UNAVAILABLE', message: 'La API de pacientes no está disponible temporalmente' },
   });
+  const patientCreate = await fetch(`${baseUrl}/api/v1/pacientes`, { method: 'POST' });
+  assert.equal(patientCreate.status, 503);
 });
 
 test('CORS permite el origen configurado incluso en preflight', async () => {

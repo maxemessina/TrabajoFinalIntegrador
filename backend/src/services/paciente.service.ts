@@ -1,5 +1,6 @@
 import { literal, Op } from 'sequelize';
 import type { Order, WhereOptions } from 'sequelize';
+import { HttpError } from '../http-error.ts';
 import type { AuthIdentity } from '../middleware/auth.ts';
 import type { PacienteListQuery } from '../schemas/paciente.schema.ts';
 import type { ApplicationModels } from './auth.service.ts';
@@ -15,24 +16,27 @@ export type PacienteResource = {
   actualizado_en: Date;
 };
 
-function toResource(patient: InstanceType<ApplicationModels['Paciente']>): PacienteResource {
-  if (!patient.usuario) {
+function toResource(
+  patient: InstanceType<ApplicationModels['Paciente']>,
+  user = patient.usuario,
+): PacienteResource {
+  if (!user) {
     throw new Error('La consulta de pacientes no incluyó el usuario asociado');
   }
   return {
     id: patient.id,
     usuario_id: patient.usuario_id,
-    nombre: patient.usuario.nombre,
-    apellido: patient.usuario.apellido,
+    nombre: user.nombre,
+    apellido: user.apellido,
     fecha_nacimiento: patient.fecha_nacimiento,
-    activo: patient.usuario.estado === 'activo',
+    activo: user.estado === 'activo',
     creado_en: patient.creado_en,
     actualizado_en: patient.actualizado_en,
   };
 }
 
 export function createPacienteService(models: ApplicationModels) {
-  const { Paciente, Usuario } = models;
+  const { Paciente, Usuario, Rol, UsuarioRol } = models;
   const database = Paciente.sequelize;
   if (!database) {
     throw new Error('El modelo de pacientes no tiene una conexión Sequelize');
@@ -114,7 +118,7 @@ export function createPacienteService(models: ApplicationModels) {
         order: orderBy(query),
       });
       return {
-        data: result.rows.map(toResource),
+        data: result.rows.map((patient) => toResource(patient)),
         meta: {
           page: query.page,
           limit: query.limit,
@@ -131,6 +135,44 @@ export function createPacienteService(models: ApplicationModels) {
         attributes: ['id', 'usuario_id', 'fecha_nacimiento', 'creado_en', 'actualizado_en'],
       });
       return patient ? toResource(patient) : null;
+    },
+
+    async create(input: { usuario_id: string; fecha_nacimiento?: string | null }) {
+      return database.transaction(async (transaction) => {
+        const user = await Usuario.findByPk(input.usuario_id, {
+          transaction,
+          lock: transaction.LOCK.UPDATE,
+        });
+        if (!user) {
+          throw new HttpError(404, 'NOT_FOUND', 'Usuario no encontrado');
+        }
+        if (user.estado !== 'activo') {
+          throw new HttpError(409, 'CONFLICT', 'El usuario debe estar activo');
+        }
+        const role = await Rol.findOne({ where: { codigo: 'paciente' }, transaction });
+        if (!role) {
+          throw new HttpError(503, 'SERVICE_UNAVAILABLE', 'El alta de pacientes no está disponible temporalmente');
+        }
+        const assignment = await UsuarioRol.findOne({
+          where: { usuario_id: user.id, rol_id: role.id },
+          transaction,
+        });
+        if (assignment) {
+          throw new HttpError(409, 'CONFLICT', 'El usuario ya tiene el rol paciente');
+        }
+        let patient = await Paciente.findOne({ where: { usuario_id: user.id }, transaction });
+        const created = !patient;
+        if (!patient) {
+          patient = await Paciente.create({
+            usuario_id: user.id,
+            fecha_nacimiento: input.fecha_nacimiento ?? null,
+          }, { transaction });
+        } else if (input.fecha_nacimiento !== undefined) {
+          await patient.update({ fecha_nacimiento: input.fecha_nacimiento }, { transaction });
+        }
+        await UsuarioRol.create({ usuario_id: user.id, rol_id: role.id }, { transaction });
+        return { patient: toResource(patient, user), created };
+      });
     },
   };
 }
