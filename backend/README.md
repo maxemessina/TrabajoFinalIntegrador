@@ -98,6 +98,8 @@ La novena migración crea `turnos` y la extensión `btree_gist` si no existe. Un
 
 La décima migración crea `notificaciones`, asociadas a un turno y su versión, con tipos y estados restringidos. La unicidad por turno, versión y tipo evita registros duplicados, pero no garantiza entrega exactamente una vez. No se programan ni envían notificaciones: el futuro servicio deberá coordinar versiones, reclamación atómica, reintentos y errores sanitizados, y definir las políticas de envío pendientes.
 
+La undécima migración crea `fichas_clinicas`, con una ficha por paciente y profesional y referencias que restringen el borrado de ambos perfiles. No crea notas ni implementa acceso clínico: PGSI-10 deberá validar la relación de atención y autorizar exclusivamente al profesional dueño. La integridad entre ficha y turno se abordará al incorporar las notas, coordinando su integración con Valentina.
+
 Agregar futuras migraciones a `src/database/migrations/` y registrarlas al final de la lista en `src/database/migrator.ts`, con nombres crecientes y únicos. No modificar ni renombrar migraciones ya aplicadas: agregar otra. No usar `sequelize.sync()` para crear el esquema de la aplicación. `defineModels` inicializa los modelos y sus asociaciones para una conexión Sequelize. La API aún no usa estos modelos; las respuestas futuras nunca deben exponer `password_hash`.
 
 Para producción, configurar una conexión cifrada y certificados verificados de acuerdo con el proveedor PostgreSQL antes de desplegar; no desactivar la verificación de certificados. La configuración de despliegue se completará en PGSI-20.
