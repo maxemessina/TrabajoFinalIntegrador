@@ -1,6 +1,6 @@
 # Backend
 
-Base de la API con Node.js, TypeScript y Express. Incluye la conexión PostgreSQL con Sequelize, el ejecutor de migraciones y los modelos iniciales de usuarios, roles, pacientes y catálogos; todavía no hay datos demo ni endpoints de dominio.
+Base de la API con Node.js, TypeScript y Express. Incluye la conexión PostgreSQL con Sequelize, el ejecutor de migraciones y los modelos iniciales de usuarios, roles, pacientes, catálogos y profesionales; todavía no hay datos demo ni endpoints de dominio.
 
 ## Arquitectura inicial
 
@@ -85,6 +85,8 @@ La segunda migración crea `roles` y `usuario_roles` y carga los códigos fijos 
 La tercera migración crea `pacientes`: cada perfil pertenece a un usuario distinto y su fecha de nacimiento opcional no puede ser futura según la fecha de la base de datos. No permite borrar físicamente un usuario con perfil de paciente. Crear el perfil no asigna el rol ni habilita acceso; la futura lógica de registro deberá crear usuario, rol y perfil en una transacción.
 
 La cuarta migración crea los catálogos `zonas` y `especialidades`, sin cargarlos todavía. Una zona es única por provincia y nombre y una especialidad por nombre, sin distinguir mayúsculas y minúsculas, incluso con acentos, mediante ICU. Ambas están activas por defecto y pueden desactivarse. Las consultas futuras que busquen estas claves sin distinguir mayúsculas deben usar la misma expresión `lower(campo COLLATE pg_catalog."und-x-icu")`.
+
+La quinta migración crea perfiles de `profesionales`, sus asociaciones con especialidades y sus trabajos. Cada perfil requiere un usuario y una zona, matrícula única y duración positiva; los perfiles y trabajos son invisibles por defecto. El servicio futuro deberá validar la zona horaria IANA, los permisos, la vigencia del rol y las condiciones para publicar, incluida una especialidad activa. Crear un perfil no asigna el rol ni lo publica.
 
 Agregar futuras migraciones a `src/database/migrations/` y registrarlas al final de la lista en `src/database/migrator.ts`, con nombres crecientes y únicos. No modificar ni renombrar migraciones ya aplicadas: agregar otra. No usar `sequelize.sync()` para crear el esquema de la aplicación. `defineModels` inicializa los modelos y sus asociaciones para una conexión Sequelize. La API aún no usa estos modelos; las respuestas futuras nunca deben exponer `password_hash`.
 

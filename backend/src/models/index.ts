@@ -1,7 +1,10 @@
 import type { Sequelize } from 'sequelize';
 import { defineEspecialidad } from './Especialidad.ts';
 import { definePaciente } from './Paciente.ts';
+import { defineProfesional } from './Profesional.ts';
+import { defineProfesionalEspecialidad } from './ProfesionalEspecialidad.ts';
 import { defineRol } from './Rol.ts';
+import { defineTrabajoProfesional } from './TrabajoProfesional.ts';
 import { defineUsuario } from './Usuario.ts';
 import { defineUsuarioRol } from './UsuarioRol.ts';
 import { defineZona } from './Zona.ts';
@@ -13,6 +16,9 @@ export function defineModels(database: Sequelize) {
   const Paciente = definePaciente(database);
   const Zona = defineZona(database);
   const Especialidad = defineEspecialidad(database);
+  const Profesional = defineProfesional(database);
+  const ProfesionalEspecialidad = defineProfesionalEspecialidad(database);
+  const TrabajoProfesional = defineTrabajoProfesional(database);
 
   Usuario.belongsToMany(Rol, {
     as: 'roles',
@@ -44,5 +50,32 @@ export function defineModels(database: Sequelize) {
     onUpdate: 'RESTRICT',
   });
 
-  return { Usuario, Rol, UsuarioRol, Paciente, Zona, Especialidad };
+  Usuario.hasOne(Profesional, {
+    as: 'profesional', foreignKey: 'usuario_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  Profesional.belongsTo(Usuario, {
+    as: 'usuario', foreignKey: 'usuario_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  Zona.hasMany(Profesional, {
+    as: 'profesionales', foreignKey: 'zona_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  Profesional.belongsTo(Zona, {
+    as: 'zona', foreignKey: 'zona_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  Profesional.belongsToMany(Especialidad, {
+    as: 'especialidades', through: ProfesionalEspecialidad, foreignKey: 'profesional_id',
+    otherKey: 'especialidad_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  Especialidad.belongsToMany(Profesional, {
+    as: 'profesionales', through: ProfesionalEspecialidad, foreignKey: 'especialidad_id',
+    otherKey: 'profesional_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  Profesional.hasMany(TrabajoProfesional, {
+    as: 'trabajos', foreignKey: 'profesional_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  TrabajoProfesional.belongsTo(Profesional, {
+    as: 'profesional', foreignKey: 'profesional_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+
+  return { Usuario, Rol, UsuarioRol, Paciente, Zona, Especialidad, Profesional, ProfesionalEspecialidad, TrabajoProfesional };
 }
