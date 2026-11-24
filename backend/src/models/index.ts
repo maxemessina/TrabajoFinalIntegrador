@@ -9,6 +9,7 @@ import { defineProfesionalEspecialidad } from './ProfesionalEspecialidad.ts';
 import { defineRol } from './Rol.ts';
 import { defineTokenRecuperacion } from './TokenRecuperacion.ts';
 import { defineTrabajoProfesional } from './TrabajoProfesional.ts';
+import { defineTurno } from './Turno.ts';
 import { defineUsuario } from './Usuario.ts';
 import { defineUsuarioRol } from './UsuarioRol.ts';
 import { defineZona } from './Zona.ts';
@@ -27,6 +28,7 @@ export function defineModels(database: Sequelize) {
   const BloqueoAgenda = defineBloqueoAgenda(database);
   const TokenRecuperacion = defineTokenRecuperacion(database);
   const EventoVisita = defineEventoVisita(database);
+  const Turno = defineTurno(database);
 
   Usuario.belongsToMany(Rol, {
     as: 'roles',
@@ -114,9 +116,21 @@ export function defineModels(database: Sequelize) {
   EventoVisita.belongsTo(Profesional, {
     as: 'profesional', foreignKey: 'profesional_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
   });
+  Paciente.hasMany(Turno, {
+    as: 'turnos', foreignKey: 'paciente_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  Turno.belongsTo(Paciente, {
+    as: 'paciente', foreignKey: 'paciente_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  Profesional.hasMany(Turno, {
+    as: 'turnos', foreignKey: 'profesional_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  Turno.belongsTo(Profesional, {
+    as: 'profesional', foreignKey: 'profesional_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
 
   return {
     Usuario, Rol, UsuarioRol, Paciente, Zona, Especialidad, Profesional, ProfesionalEspecialidad, TrabajoProfesional,
-    HorarioAtencion, BloqueoAgenda, TokenRecuperacion, EventoVisita,
+    HorarioAtencion, BloqueoAgenda, TokenRecuperacion, EventoVisita, Turno,
   };
 }

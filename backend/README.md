@@ -58,7 +58,7 @@ CORS controla qué respuestas puede leer un navegador desde otro origen; no sust
 
 ## Conexión a PostgreSQL
 
-Instalar PostgreSQL 13 o superior con soporte ICU y crear una base local vacía con un usuario autorizado para crear tablas e índices. La migración de catálogos requiere la intercalación `und-x-icu`, disponible en instalaciones PostgreSQL con ICU. En el `.env` de la raíz, completar `DATABASE_URL` con una URL `postgres://` o `postgresql://` que incluya host y nombre de base. Ejemplo de formato, con marcadores que deben reemplazarse localmente:
+Instalar PostgreSQL 13 o superior con soporte ICU y la extensión `btree_gist` disponible, y crear una base local vacía con un usuario autorizado para crear tablas, índices y la extensión. La migración de catálogos requiere la intercalación `und-x-icu`, disponible en instalaciones PostgreSQL con ICU. En el `.env` de la raíz, completar `DATABASE_URL` con una URL `postgres://` o `postgresql://` que incluya host y nombre de base. Ejemplo de formato, con marcadores que deben reemplazarse localmente:
 
 ```text
 DATABASE_URL=postgres://USUARIO:CONTRASENA@localhost:5432/portal_salud
@@ -93,6 +93,8 @@ La sexta migración crea `horarios_atencion` y `bloqueos_agenda`, vinculados a p
 La séptima migración crea `tokens_recuperacion`, vinculada a usuarios, con hash único, vencimiento y fecha opcional de uso. La tabla no genera ni envía tokens y no valida por sí sola el vencimiento o el uso único. La futura recuperación deberá guardar solo hashes, consumir el token y cambiar la contraseña de forma atómica, y nunca exponer ni registrar tokens o hashes.
 
 La octava migración crea `eventos_visita`: admite visitas anónimas y distingue visitas al inicio de visitas a un perfil profesional. Es solo el esquema; no activa la captura real ni implementa métricas. Antes de registrar visitas deben definirse consentimiento, retención y privacidad. No almacena IP, cookies ni información clínica.
+
+La novena migración crea `turnos` y la extensión `btree_gist` si no existe. Una restricción impide solapar turnos reservados del mismo profesional y permite intervalos contiguos `[inicio, fin)`; los demás estados no ocupan la franja. Esto no sustituye los servicios: PGSI-8 y PGSI-9 deberán serializar las operaciones de horarios, bloqueos y turnos por profesional, controlar permisos, disponibilidad, transiciones y versiones. Coordinar con Valentina la integración y revisión de estas reglas.
 
 Agregar futuras migraciones a `src/database/migrations/` y registrarlas al final de la lista en `src/database/migrator.ts`, con nombres crecientes y únicos. No modificar ni renombrar migraciones ya aplicadas: agregar otra. No usar `sequelize.sync()` para crear el esquema de la aplicación. `defineModels` inicializa los modelos y sus asociaciones para una conexión Sequelize. La API aún no usa estos modelos; las respuestas futuras nunca deben exponer `password_hash`.
 
