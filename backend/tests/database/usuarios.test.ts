@@ -12,7 +12,7 @@ if (!process.env.TEST_DATABASE_URL) {
 const database = createDatabase(readDatabaseUrl({ DATABASE_URL: process.env.TEST_DATABASE_URL }));
 const {
   Usuario, Rol, UsuarioRol, Paciente, Zona, Especialidad, Profesional, ProfesionalEspecialidad, TrabajoProfesional,
-  HorarioAtencion, BloqueoAgenda, TokenRecuperacion, EventoVisita, Turno,
+  HorarioAtencion, BloqueoAgenda, TokenRecuperacion, EventoVisita, Turno, Notificacion,
 } = defineModels(database);
 
 before(async () => {
@@ -20,7 +20,7 @@ before(async () => {
   for (const name of [
     '001_create_usuarios', '002_create_roles', '003_create_pacientes', '004_create_catalogos',
     '005_create_profesionales', '006_create_agenda', '007_create_tokens_recuperacion', '008_create_eventos_visita',
-    '009_create_turnos',
+    '009_create_turnos', '010_create_notificaciones',
   ]) {
     assert.ok(results.flat().filter((applied) => applied === name).length <= 1);
   }
@@ -50,6 +50,7 @@ test('los modelos coinciden con las columnas y claves de sus tablas', async () =
     ['tokens_recuperacion', Object.entries(TokenRecuperacion.getAttributes())],
     ['eventos_visita', Object.entries(EventoVisita.getAttributes())],
     ['turnos', Object.entries(Turno.getAttributes())],
+    ['notificaciones', Object.entries(Notificacion.getAttributes())],
   ] as const;
   for (const [table, attributes] of models) {
     const columns = await database.getQueryInterface().describeTable(table);

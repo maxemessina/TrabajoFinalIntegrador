@@ -96,6 +96,8 @@ La octava migración crea `eventos_visita`: admite visitas anónimas y distingue
 
 La novena migración crea `turnos` y la extensión `btree_gist` si no existe. Una restricción impide solapar turnos reservados del mismo profesional y permite intervalos contiguos `[inicio, fin)`; los demás estados no ocupan la franja. Esto no sustituye los servicios: PGSI-8 y PGSI-9 deberán serializar las operaciones de horarios, bloqueos y turnos por profesional, controlar permisos, disponibilidad, transiciones y versiones. Coordinar con Valentina la integración y revisión de estas reglas.
 
+La décima migración crea `notificaciones`, asociadas a un turno y su versión, con tipos y estados restringidos. La unicidad por turno, versión y tipo evita registros duplicados, pero no garantiza entrega exactamente una vez. No se programan ni envían notificaciones: el futuro servicio deberá coordinar versiones, reclamación atómica, reintentos y errores sanitizados, y definir las políticas de envío pendientes.
+
 Agregar futuras migraciones a `src/database/migrations/` y registrarlas al final de la lista en `src/database/migrator.ts`, con nombres crecientes y únicos. No modificar ni renombrar migraciones ya aplicadas: agregar otra. No usar `sequelize.sync()` para crear el esquema de la aplicación. `defineModels` inicializa los modelos y sus asociaciones para una conexión Sequelize. La API aún no usa estos modelos; las respuestas futuras nunca deben exponer `password_hash`.
 
 Para producción, configurar una conexión cifrada y certificados verificados de acuerdo con el proveedor PostgreSQL antes de desplegar; no desactivar la verificación de certificados. La configuración de despliegue se completará en PGSI-20.
