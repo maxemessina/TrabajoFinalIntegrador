@@ -6,6 +6,10 @@ export type AppConfig = {
   corsOrigin: string;
 };
 
+export type AuthConfig = {
+  jwtSecret: string;
+};
+
 export function loadEnv() {
   const result = dotenv.config({
     path: fileURLToPath(new URL('../../.env', import.meta.url)),
@@ -41,4 +45,12 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   }
 
   return { port: Number(portValue), corsOrigin };
+}
+
+export function readAuthConfig(env: NodeJS.ProcessEnv = process.env): AuthConfig {
+  const jwtSecret = env.JWT_SECRET;
+  if (!jwtSecret || jwtSecret.trim() !== jwtSecret || Buffer.byteLength(jwtSecret, 'utf8') < 32) {
+    throw new Error('JWT_SECRET debe tener al menos 32 bytes aleatorios, sin espacios al inicio o al final');
+  }
+  return { jwtSecret };
 }
