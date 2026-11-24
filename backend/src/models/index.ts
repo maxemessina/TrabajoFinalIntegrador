@@ -6,6 +6,7 @@ import { definePaciente } from './Paciente.ts';
 import { defineProfesional } from './Profesional.ts';
 import { defineProfesionalEspecialidad } from './ProfesionalEspecialidad.ts';
 import { defineRol } from './Rol.ts';
+import { defineTokenRecuperacion } from './TokenRecuperacion.ts';
 import { defineTrabajoProfesional } from './TrabajoProfesional.ts';
 import { defineUsuario } from './Usuario.ts';
 import { defineUsuarioRol } from './UsuarioRol.ts';
@@ -23,6 +24,7 @@ export function defineModels(database: Sequelize) {
   const TrabajoProfesional = defineTrabajoProfesional(database);
   const HorarioAtencion = defineHorarioAtencion(database);
   const BloqueoAgenda = defineBloqueoAgenda(database);
+  const TokenRecuperacion = defineTokenRecuperacion(database);
 
   Usuario.belongsToMany(Rol, {
     as: 'roles',
@@ -92,9 +94,15 @@ export function defineModels(database: Sequelize) {
   BloqueoAgenda.belongsTo(Profesional, {
     as: 'profesional', foreignKey: 'profesional_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
   });
+  Usuario.hasMany(TokenRecuperacion, {
+    as: 'tokensRecuperacion', foreignKey: 'usuario_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
+  TokenRecuperacion.belongsTo(Usuario, {
+    as: 'usuario', foreignKey: 'usuario_id', onDelete: 'RESTRICT', onUpdate: 'RESTRICT',
+  });
 
   return {
     Usuario, Rol, UsuarioRol, Paciente, Zona, Especialidad, Profesional, ProfesionalEspecialidad, TrabajoProfesional,
-    HorarioAtencion, BloqueoAgenda,
+    HorarioAtencion, BloqueoAgenda, TokenRecuperacion,
   };
 }

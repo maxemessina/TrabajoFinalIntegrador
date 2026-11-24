@@ -90,6 +90,8 @@ La quinta migración crea perfiles de `profesionales`, sus asociaciones con espe
 
 La sexta migración crea `horarios_atencion` y `bloqueos_agenda`, vinculados a profesionales. Valida día semanal, orden de horas y fechas de vigencia, e intervalos de bloqueo; los horarios están activos por defecto. La prevención de solapamientos, los permisos y la coordinación transaccional con turnos quedan para los servicios de PGSI-8 y PGSI-9; estas tablas por sí solas no calculan disponibilidad. El motivo del bloqueo es privado.
 
+La séptima migración crea `tokens_recuperacion`, vinculada a usuarios, con hash único, vencimiento y fecha opcional de uso. La tabla no genera ni envía tokens y no valida por sí sola el vencimiento o el uso único. La futura recuperación deberá guardar solo hashes, consumir el token y cambiar la contraseña de forma atómica, y nunca exponer ni registrar tokens o hashes.
+
 Agregar futuras migraciones a `src/database/migrations/` y registrarlas al final de la lista en `src/database/migrator.ts`, con nombres crecientes y únicos. No modificar ni renombrar migraciones ya aplicadas: agregar otra. No usar `sequelize.sync()` para crear el esquema de la aplicación. `defineModels` inicializa los modelos y sus asociaciones para una conexión Sequelize. La API aún no usa estos modelos; las respuestas futuras nunca deben exponer `password_hash`.
 
 Para producción, configurar una conexión cifrada y certificados verificados de acuerdo con el proveedor PostgreSQL antes de desplegar; no desactivar la verificación de certificados. La configuración de despliegue se completará en PGSI-20.
