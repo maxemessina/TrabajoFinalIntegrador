@@ -1,10 +1,13 @@
 import { DataTypes, Model, literal } from 'sequelize';
-import type { CreationOptional, InferAttributes, InferCreationAttributes, Sequelize } from 'sequelize';
+import type { CreationOptional, InferAttributes, InferCreationAttributes, NonAttribute, Sequelize } from 'sequelize';
+
+type UsuarioResumen = { nombre: string; apellido: string; estado: 'activo' | 'inactivo' };
 
 export function definePaciente(database: Sequelize) {
   class Paciente extends Model<InferAttributes<Paciente>, InferCreationAttributes<Paciente>> {
     declare id: CreationOptional<string>;
     declare usuario_id: string;
+    declare usuario?: NonAttribute<UsuarioResumen>;
     declare fecha_nacimiento: string | null;
     declare creado_en: CreationOptional<Date>;
     declare actualizado_en: CreationOptional<Date>;

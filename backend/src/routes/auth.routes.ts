@@ -4,6 +4,7 @@ import { HttpError } from '../http-error.ts';
 import { requireAuth } from '../middleware/auth.ts';
 import { parseLogin, parsePasswordReset, parseProfileUpdate, parseRecoveryRequest, parseRegistration } from '../schemas/auth.schema.ts';
 import { createAuthService } from '../services/auth.service.ts';
+import type { AuthService } from '../services/auth.service.ts';
 import type { EmailService } from '../services/email.service.ts';
 import { createMockEmailService } from '../services/email.service.ts';
 import type { Sequelize } from 'sequelize';
@@ -29,17 +30,17 @@ export function createUnavailableAuthRouter() {
   return router;
 }
 
-export function createAuthRouter(dependencies: AuthRouteDependencies) {
+export function createAuthRouter(dependencies: AuthRouteDependencies, authService?: AuthService) {
   const router = Router();
-  const authService = createAuthService(
+  const service = authService ?? createAuthService(
     dependencies.database,
     dependencies.jwtSecret,
     dependencies.emailService ?? createMockEmailService(),
   );
-  const authenticate = requireAuth(authService);
+  const authenticate = requireAuth(service);
 
   router.post('/auth/registro', async (request, response) => {
-    const result = await authService.register(parseRegistration(request.body));
+    const result = await service.register(parseRegistration(request.body));
     response
       .status(201)
       .location(`/api/v1/pacientes/${result.patient.id}`)
@@ -48,7 +49,7 @@ export function createAuthRouter(dependencies: AuthRouteDependencies) {
 
   router.post('/auth/login', async (request, response) => {
     const input = parseLogin(request.body);
-    const result = await authService.login(input.email, input.password);
+    const result = await service.login(input.email, input.password);
     response.status(200).json({
       data: {
         access_token: result.accessToken,
@@ -61,7 +62,7 @@ export function createAuthRouter(dependencies: AuthRouteDependencies) {
 
   router.post('/auth/recuperacion', async (request, response) => {
     const input = parseRecoveryRequest(request.body);
-    await authService.requestPasswordReset(input.email);
+    await service.requestPasswordReset(input.email);
     response.status(202).json({
       data: { message: 'Si la cuenta existe y está activa, recibirá instrucciones de recuperación.' },
     });
@@ -69,7 +70,7 @@ export function createAuthRouter(dependencies: AuthRouteDependencies) {
 
   router.post('/auth/restablecimiento', async (request, response) => {
     const input = parsePasswordReset(request.body);
-    await authService.resetPassword(input.token, input.password);
+    await service.resetPassword(input.token, input.password);
     response.status(200).json({
       data: { message: 'La contraseña se restableció correctamente.' },
     });
@@ -87,7 +88,7 @@ export function createAuthRouter(dependencies: AuthRouteDependencies) {
       throw new HttpError(401, 'UNAUTHENTICATED', 'Autenticación requerida');
     }
     const changes = parseProfileUpdate(request.body);
-    const user = await authService.updateProfile(request.auth.userId, changes);
+    const user = await service.updateProfile(request.auth.userId, changes);
     response.status(200).json({ data: user });
   });
 

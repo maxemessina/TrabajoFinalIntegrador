@@ -46,6 +46,11 @@ test('sin base configurada auth devuelve 503 y health sigue disponible', async (
   assert.deepEqual(await response.json(), {
     error: { code: 'SERVICE_UNAVAILABLE', message: 'La autenticación no está disponible temporalmente' },
   });
+  const patients = await fetch(`${baseUrl}/api/v1/pacientes`);
+  assert.equal(patients.status, 503);
+  assert.deepEqual(await patients.json(), {
+    error: { code: 'SERVICE_UNAVAILABLE', message: 'La API de pacientes no está disponible temporalmente' },
+  });
 });
 
 test('CORS permite el origen configurado incluso en preflight', async () => {

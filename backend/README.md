@@ -125,6 +125,10 @@ La recuperación guarda únicamente SHA-256 del token aleatorio, invalida tokens
 
 Si `DATABASE_URL` no está configurada, las rutas de auth devuelven `503` explícito, sin simular registro o login. Con DB configurada se requiere migrar el esquema y establecer `JWT_SECRET` antes de iniciar la API.
 
+## Pacientes (PGSI-6)
+
+La primera etapa implementa `GET /api/v1/pacientes` y `GET /api/v1/pacientes/:id`. Las listas validan búsqueda por nombre/apellido, filtro de actividad, orden y paginación; `total` cuenta todos los resultados visibles antes de paginar. Un paciente consulta solo su perfil, un profesional solo perfiles con turnos compartidos no cancelados y el administrador puede consultar todos. La respuesta no incluye email, teléfono, contraseña ni datos clínicos. Las operaciones de escritura y baja lógica quedan para la siguiente etapa de PGSI-6.
+
 Para producción, configurar una conexión cifrada y certificados verificados de acuerdo con el proveedor PostgreSQL antes de desplegar; no desactivar la verificación de certificados. La configuración de despliegue se completará en PGSI-20.
 
 ## Datos de demostración

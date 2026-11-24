@@ -32,6 +32,8 @@ export type RegisterInput = {
   fecha_nacimiento?: string | null;
 };
 
+export type ApplicationModels = ReturnType<typeof defineModels>;
+
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -40,10 +42,15 @@ function hashResetToken(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
 }
 
-export function createAuthService(database: Sequelize, jwtSecret: string, emailService: EmailService) {
+export function createAuthService(
+  database: Sequelize,
+  jwtSecret: string,
+  emailService: EmailService,
+  models: ApplicationModels = defineModels(database),
+) {
   const {
     Usuario, Rol, UsuarioRol, Paciente, TokenRecuperacion,
-  } = defineModels(database);
+  } = models;
   const accessTokens = createAccessTokenService(jwtSecret);
 
   async function getRoleCodes(userId: string, transaction?: Transaction): Promise<CodigoRol[]> {
@@ -245,3 +252,5 @@ export function createAuthService(database: Sequelize, jwtSecret: string, emailS
     },
   };
 }
+
+export type AuthService = ReturnType<typeof createAuthService>;
